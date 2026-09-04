@@ -771,7 +771,7 @@ mod tests {
 
     #[test]
     fn main_screen_lists_packages() {
-        let app = App::for_test(sample());
+        let app = App::with_snapshot(sample());
         assert!(shows(&app, "jdtui · jd2@test"));
         assert!(shows(&app, "Show S01"));
         assert!(shows(&app, "Extraction OK"));
@@ -780,7 +780,7 @@ mod tests {
 
     #[test]
     fn removing_asks_what_happens_to_the_files() {
-        let mut app = App::for_test(sample());
+        let mut app = App::with_snapshot(sample());
         app.mode = crate::app::Mode::RemoveChoice;
         assert!(shows(&app, "What about the files"), "the question must be visible");
         for mode in crate::app::REMOVE_MODES {
@@ -790,7 +790,7 @@ mod tests {
 
     #[test]
     fn the_choice_stays_visible_while_confirming() {
-        let mut app = App::for_test(sample());
+        let mut app = App::with_snapshot(sample());
         app.mode = crate::app::Mode::Confirm(Action::RemoveWith(crate::api::RemoveMode::DeleteFiles));
         app.message = Some(("Remove and delete files from disk on Package?  [y/N]".into(), false));
         assert!(shows(&app, "What about the files"));
@@ -799,7 +799,7 @@ mod tests {
 
     #[test]
     fn properties_show_the_link_details() {
-        let mut app = App::for_test(sample());
+        let mut app = App::with_snapshot(sample());
         app.expanded.insert(10);
         app.rows = crate::model::build_rows(&app.snapshot.downloads, &app.expanded);
         app.cursor = 1; // the link under the package
@@ -811,7 +811,7 @@ mod tests {
 
     #[test]
     fn add_form_shows_every_field() {
-        let mut app = App::for_test(sample());
+        let mut app = App::with_snapshot(sample());
         app.form = Some(crate::model::Form::add_links());
         app.mode = crate::app::Mode::Add;
         for label in ["Links", "Package name", "Save to", "Priority", "Autostart"] {

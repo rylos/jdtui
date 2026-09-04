@@ -118,11 +118,10 @@ impl App {
         app
     }
 
-    /// Build an app sitting on the main screen with a given snapshot, with no
-    /// session behind it. Rendering does not touch the network, so this is
-    /// what the interface tests draw.
-    #[cfg(test)]
-    pub fn for_test(snapshot: Snapshot) -> Self {
+    /// Build an app sitting on the main screen with a given snapshot and no
+    /// session behind it. Rendering never touches the network, so this is what
+    /// the interface tests and the screenshot example draw.
+    pub fn with_snapshot(snapshot: Snapshot) -> Self {
         let mut app = App {
             config: Config::default(),
             screen: Screen::Main,

@@ -9,6 +9,8 @@ desktop GUI: packages with their links, split across a **Downloads** and a
 from anywhere the account does, with as many JDownloader instances as you have
 connected to it.
 
+![The download list](docs/downloads.svg)
+
 ## Install
 
 ```bash
@@ -51,14 +53,25 @@ The context menu acts on every marked row at once, so a dozen links can be
 forced, reset, disabled or removed in a single action. Destructive entries ask
 for confirmation first.
 
+![Acting on several links at once](docs/context-menu.svg)
+
 Removing from the **Downloads** tab asks what should happen to the files already
 on disk, the same three choices the desktop GUI offers: leave them, move them to
 the recycle bin, or delete them. The two that touch data ask again before
 running.
 
+![Choosing what happens to the files](docs/remove.svg)
+
 `n` opens the same form as the GUI's add dialog: urls, package name, destination
 folder, extract and download passwords, priority and autostart. Pasting a list
 of urls works; newlines become separators.
+
+![Adding links](docs/add-links.svg)
+
+The **Link Grabber** tab shows what is waiting to be confirmed, with the
+availability and hoster of every link:
+
+![The link grabber](docs/link-grabber.svg)
 
 ## Config
 
@@ -82,6 +95,12 @@ against the reference Python client, byte for byte.
 
 Refreshes run on a background thread so the interface never waits on the
 network; actions you trigger are sent immediately and force an early refresh.
+
+## Screenshots
+
+The images above are generated, not captured: `cargo run --example screenshots`
+draws the real interface into a test buffer and writes `docs/*.svg`. They cannot
+drift from the code, and the data in them is invented.
 
 ## Credits
 

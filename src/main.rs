@@ -1,13 +1,5 @@
 //! jdtui — a terminal UI for JDownloader 2, over the My.JDownloader API.
 
-mod api;
-mod app;
-mod config;
-mod model;
-mod myjd;
-mod poller;
-mod ui;
-
 use std::io::stdout;
 use std::time::Duration;
 
@@ -18,8 +10,9 @@ use ratatui::crossterm::event::{
 };
 use ratatui::crossterm::execute;
 
-use crate::app::{App, Key};
-use crate::config::Config;
+use jdtui::app::{App, Key};
+use jdtui::config::Config;
+use jdtui::ui;
 
 #[derive(Parser, Debug)]
 #[command(name = "jdtui", version, about = "A terminal UI for JDownloader 2")]
