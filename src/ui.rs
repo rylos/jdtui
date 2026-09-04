@@ -315,16 +315,16 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         (area, None)
     };
 
-    if app.mode == Mode::Add
+    if matches!(app.mode, Mode::Add | Mode::Rename | Mode::Directory)
         && let Some(form) = &app.form
     {
         draw_list(frame, app, list_area);
-        let popup = centered(area, 90, 13);
+        let popup = centered(area, 90, form.fields.len() as u16 + 6);
         frame.render_widget(Clear, popup);
-        let hint = if form.is_valid() {
-            "Enter add · Tab/↑↓ field · ←→ change · Esc cancel"
-        } else {
-            "Paste at least one url · Tab/↑↓ field · Esc cancel"
+        let hint = match app.mode {
+            Mode::Add if form.is_valid() => "Enter add · Tab/↑↓ field · ←→ change · Esc cancel",
+            Mode::Add => "Paste at least one url · Tab/↑↓ field · Esc cancel",
+            _ => "Enter apply · Esc cancel",
         };
         let block = panel(form.title, Some(hint));
         let inner = block.inner(popup);
