@@ -1,0 +1,54 @@
+Draft announcement for the JDownloader community (board.jdownloader.org,
+r/JDownloader, or anywhere else you post it). Not published by me: posting
+needs your account, and an announcement should go out in your name.
+
+--- title -------------------------------------------------------------------
+
+jdtui — a terminal UI for JDownloader 2 over the My.JDownloader API
+
+--- body --------------------------------------------------------------------
+
+I wanted to drive JDownloader from a terminal, on machines where the GUI is
+not an option, so I wrote jdtui:
+
+https://github.com/rylos/jdtui
+
+It signs in with a My.JDownloader account, so there is nothing to enable on the
+JDownloader side, it works from anywhere the account does, and it handles every
+instance connected to the account.
+
+What it shows is the same tree as the desktop GUI: packages with their links,
+split across a Downloads and a Link Grabber tab.
+
+- mark several rows and act on all of them at once: force, reset,
+  enable/disable, remove
+- removing from the Downloads tab asks what to do with the files already on
+  disk, the same three choices the desktop dialog offers
+- properties panel, and an add-links form with the fields of the GUI's dialog
+- switch between the JDownloader instances on the account without restarting
+- a single static binary, no runtime to install
+
+Install with a Rust toolchain:
+
+    cargo install --git https://github.com/rylos/jdtui
+
+or take the prebuilt Linux x86_64 binary from the releases page.
+
+The My.JDownloader protocol is implemented natively rather than through a
+library: request ids, HMAC-signed server calls, AES-CBC encrypted device calls,
+session and regain tokens. The tests pin key derivation, query signing and the
+cipher against the reference Python client byte for byte, so it should behave
+exactly like any other client of the API.
+
+MIT licensed. Feedback and bug reports welcome, especially from anyone running
+it against a setup different from mine.
+
+--- notes -------------------------------------------------------------------
+
+Where this fits: board.jdownloader.org has a section for third party tools,
+which is the right place for it rather than the support sections. On Reddit,
+r/JDownloader. Both want an account.
+
+Worth saying plainly in any thread: the tool asks for My.JDownloader
+credentials and stores them locally in ~/.config/jdtui/config.toml with mode
+0600. People will ask, and it is better to state it up front than to be asked.
