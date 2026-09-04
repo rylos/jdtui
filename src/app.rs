@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::api::{AddLinks, JdApi, Snapshot, describe_error};
+use crate::api::{AddLinks, JdApi, RemoveMode, Snapshot, describe_error};
 use crate::config::Config;
 use crate::model::{
     Action, Form, MenuEntry, Row, RowKey, Tab, build_rows, collect_ids, context_menu, describe, packages_of, row_key,
@@ -12,6 +12,9 @@ use crate::model::{
 };
 use crate::myjd::{Device, MyJd};
 use crate::poller::{Poller, Update};
+
+/// Offered in the order the GUI lists them: safest first.
+pub const REMOVE_MODES: [RemoveMode; 3] = [RemoveMode::ListOnly, RemoveMode::Recycle, RemoveMode::DeleteFiles];
 
 pub enum Screen {
     /// Asking for credentials; `error` explains why the last attempt failed.
@@ -33,6 +36,8 @@ pub enum Mode {
     Menu,
     Properties,
     Confirm(Action),
+    /// Choosing what happens to the files of the packages being removed.
+    RemoveChoice,
     Add,
 }
 
@@ -71,6 +76,8 @@ pub struct App {
 
     pub menu: Vec<MenuEntry>,
     pub menu_index: usize,
+    /// Highlighted entry of the remove-choice panel.
+    pub remove_index: usize,
     pub form: Option<Form>,
 
     /// Footer message and whether it is an error.
@@ -98,6 +105,7 @@ impl App {
             marked: HashSet::new(),
             menu: Vec::new(),
             menu_index: 0,
+            remove_index: 0,
             form: None,
             message: None,
             refresh_error: None,
@@ -107,6 +115,37 @@ impl App {
             let password = app.config.password.clone().unwrap_or_default();
             app.sign_in(&email, &password);
         }
+        app
+    }
+
+    /// Build an app sitting on the main screen with a given snapshot, with no
+    /// session behind it. Rendering does not touch the network, so this is
+    /// what the interface tests draw.
+    #[cfg(test)]
+    pub fn for_test(snapshot: Snapshot) -> Self {
+        let mut app = App {
+            config: Config::default(),
+            screen: Screen::Main,
+            mode: Mode::List,
+            should_quit: false,
+            myjd: None,
+            api: None,
+            poller: None,
+            device_name: "jd2@test".into(),
+            snapshot,
+            tab: Tab::Downloads,
+            rows: Vec::new(),
+            cursor: 0,
+            expanded: HashSet::new(),
+            marked: HashSet::new(),
+            menu: Vec::new(),
+            menu_index: 0,
+            remove_index: 0,
+            form: None,
+            message: None,
+            refresh_error: None,
+        };
+        app.rebuild_rows();
         app
     }
 
@@ -302,6 +341,13 @@ impl App {
             }
             Action::Reset => self.with_api(|a| a.reset(&links, &pkgs)).map(|_| format!("{what} reset")),
             Action::Remove => self.with_api(|a| a.remove(&links, &pkgs, grabber)).map(|_| format!("{what} removed")),
+            Action::RemoveWith(mode) => {
+                self.with_api(|a| a.remove_with_files(&links, &pkgs, mode)).map(|_| match mode {
+                    RemoveMode::ListOnly => format!("{what} removed from the list"),
+                    RemoveMode::Recycle => format!("{what} removed, files moved to the recycle bin"),
+                    RemoveMode::DeleteFiles => format!("{what} removed, files deleted"),
+                })
+            }
             Action::Cleanup => {
                 self.with_api(|a| a.cleanup_finished(&links, &pkgs)).map(|_| "Finished links deleted".into())
             }
@@ -380,6 +426,28 @@ impl App {
                         self.mode = Mode::List;
                     }
                 }
+                Mode::RemoveChoice => match key {
+                    Key::Esc | Key::Left | Key::Char('q') => {
+                        self.mode = Mode::List;
+                        self.message = Some(("Cancelled".into(), false));
+                    }
+                    Key::Up | Key::Char('k') => self.remove_index = self.remove_index.saturating_sub(1),
+                    Key::Down | Key::Char('j') => {
+                        self.remove_index = (self.remove_index + 1).min(REMOVE_MODES.len() - 1)
+                    }
+                    Key::Enter | Key::Right | Key::Char(' ') => {
+                        let mode = REMOVE_MODES[self.remove_index];
+                        if mode.touches_files() {
+                            // Deleting data gets its own yes/no, like the GUI.
+                            let targets = self.target_rows();
+                            self.message = Some((format!("{} on {}?  [y/N]", mode.label(), describe(&targets)), false));
+                            self.mode = Mode::Confirm(Action::RemoveWith(mode));
+                        } else {
+                            self.run_action(Action::RemoveWith(mode));
+                        }
+                    }
+                    _ => {}
+                },
                 Mode::Confirm(action) => match key {
                     Key::Char('y' | 'Y') => self.run_action(action),
                     _ => {
@@ -523,7 +591,12 @@ impl App {
             }
             Key::Enter | Key::Right | Key::Char(' ') => {
                 let Some(entry) = self.menu.get(self.menu_index).cloned() else { return };
-                if entry.confirm {
+                if entry.action == Action::Remove && !self.tab.is_grabber() {
+                    // Files may exist on disk: ask what to do with them,
+                    // the way the desktop dialog does.
+                    self.remove_index = 0;
+                    self.mode = Mode::RemoveChoice;
+                } else if entry.confirm {
                     let targets = self.target_rows();
                     let subject = if targets.len() == 1 {
                         let name = row_name(self.packages(), &targets[0]);

@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use crate::api::{Package, Snapshot};
+use crate::api::{Package, RemoveMode, Snapshot};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
@@ -126,7 +126,10 @@ pub enum Action {
     Force,
     Reset,
     Cleanup,
+    /// Ask what to do with the files first, on the downloads tab.
     Remove,
+    /// Remove, having decided about the files.
+    RemoveWith(RemoveMode),
     MoveToDownloads,
     Properties,
 }

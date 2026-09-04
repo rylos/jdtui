@@ -51,6 +51,11 @@ The context menu acts on every marked row at once, so a dozen links can be
 forced, reset, disabled or removed in a single action. Destructive entries ask
 for confirmation first.
 
+Removing from the **Downloads** tab asks what should happen to the files already
+on disk, the same three choices the desktop GUI offers: leave them, move them to
+the recycle bin, or delete them. The two that touch data ask again before
+running.
+
 `n` opens the same form as the GUI's add dialog: urls, package name, destination
 folder, extract and download passwords, priority and autostart. Pasting a list
 of urls works; newlines become separators.

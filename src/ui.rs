@@ -301,6 +301,7 @@ fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
     let side_width = match app.mode {
         Mode::Menu => 34,
+        Mode::RemoveChoice | Mode::Confirm(crate::model::Action::RemoveWith(_)) => 46,
         Mode::Properties => 62,
         _ => 0,
     };
@@ -335,6 +336,9 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
     if let Some(side) = side_area {
         match app.mode {
             Mode::Menu => draw_menu(frame, app, side),
+            Mode::RemoveChoice | Mode::Confirm(crate::model::Action::RemoveWith(_)) => {
+                draw_remove_choice(frame, app, side)
+            }
             Mode::Properties => draw_properties(frame, app, side),
             _ => {}
         }
@@ -551,6 +555,28 @@ fn grabber_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static str>
     (header, widths, rows)
 }
 
+fn draw_remove_choice(frame: &mut Frame, app: &App, area: Rect) {
+    let targets = app.target_rows();
+    let block = panel(&format!("Remove {}", describe(&targets)), Some("Enter choose · Esc cancel"));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let mut lines = vec![Line::from(Span::styled(" What about the files already on disk?", Style::new().dim()))];
+    lines.push(Line::raw(""));
+    for (i, mode) in crate::app::REMOVE_MODES.iter().enumerate() {
+        let selected = i == app.remove_index;
+        let style = if selected {
+            selected_style()
+        } else if mode.touches_files() {
+            Style::new().fg(Color::Red)
+        } else {
+            Style::new()
+        };
+        lines.push(Line::from(Span::styled(format!(" {} {}", if selected { "›" } else { " " }, mode.label()), style)));
+    }
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
 fn draw_menu(frame: &mut Frame, app: &App, area: Rect) {
     let targets = app.target_rows();
     let block = panel(&describe(&targets), Some("Enter run · Esc close"));
@@ -689,4 +715,107 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
         }
     };
     frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), area);
+}
+
+#[cfg(test)]
+mod tests {
+    //! Render whole frames into a test buffer and assert on what a user would
+    //! actually see. Scraping a pty cannot do this reliably: ratatui moves the
+    //! cursor instead of emitting lines.
+    use super::*;
+    use crate::api::{Link, Package, Snapshot};
+    use crate::app::App;
+    use crate::model::Action;
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    fn sample() -> Snapshot {
+        let link = Link {
+            uuid: 20,
+            name: "Show.S01E01.mkv".into(),
+            package_uuid: 10,
+            bytes_loaded: Some(512),
+            bytes_total: Some(1024),
+            host: Some("example.org".into()),
+            url: Some("https://example.org/one".into()),
+            ..Default::default()
+        };
+        let package = Package {
+            uuid: 10,
+            name: "Show S01".into(),
+            bytes_loaded: Some(512),
+            bytes_total: Some(1024),
+            child_count: Some(1),
+            enabled: Some(true),
+            finished: Some(true),
+            save_to: Some("/output/Show S01".into()),
+            status: Some("Extraction OK".into()),
+            links: vec![link],
+            ..Default::default()
+        };
+        Snapshot { state: "IDLE".into(), downloads: vec![package], grabber: Vec::new() }
+    }
+
+    /// The whole frame as text, one string per row.
+    fn render(app: &App) -> Vec<String> {
+        let mut terminal = Terminal::new(TestBackend::new(170, 30)).unwrap();
+        terminal.draw(|frame| draw(frame, app)).unwrap();
+        let buffer = terminal.backend().buffer().clone();
+        let width = buffer.area().width as usize;
+        buffer.content().chunks(width).map(|row| row.iter().map(|c| c.symbol()).collect::<String>()).collect()
+    }
+
+    fn shows(app: &App, needle: &str) -> bool {
+        render(app).iter().any(|line| line.contains(needle))
+    }
+
+    #[test]
+    fn main_screen_lists_packages() {
+        let app = App::for_test(sample());
+        assert!(shows(&app, "jdtui · jd2@test"));
+        assert!(shows(&app, "Show S01"));
+        assert!(shows(&app, "Extraction OK"));
+        assert!(shows(&app, "Downloads (1)"));
+    }
+
+    #[test]
+    fn removing_asks_what_happens_to_the_files() {
+        let mut app = App::for_test(sample());
+        app.mode = crate::app::Mode::RemoveChoice;
+        assert!(shows(&app, "What about the files"), "the question must be visible");
+        for mode in crate::app::REMOVE_MODES {
+            assert!(shows(&app, mode.label()), "missing choice: {}", mode.label());
+        }
+    }
+
+    #[test]
+    fn the_choice_stays_visible_while_confirming() {
+        let mut app = App::for_test(sample());
+        app.mode = crate::app::Mode::Confirm(Action::RemoveWith(crate::api::RemoveMode::DeleteFiles));
+        app.message = Some(("Remove and delete files from disk on Package?  [y/N]".into(), false));
+        assert!(shows(&app, "What about the files"));
+        assert!(shows(&app, "[y/N]"));
+    }
+
+    #[test]
+    fn properties_show_the_link_details() {
+        let mut app = App::for_test(sample());
+        app.expanded.insert(10);
+        app.rows = crate::model::build_rows(&app.snapshot.downloads, &app.expanded);
+        app.cursor = 1; // the link under the package
+        app.mode = crate::app::Mode::Properties;
+        assert!(shows(&app, "Properties"));
+        assert!(shows(&app, "example.org"));
+        assert!(shows(&app, "/output/Show S01"));
+    }
+
+    #[test]
+    fn add_form_shows_every_field() {
+        let mut app = App::for_test(sample());
+        app.form = Some(crate::model::Form::add_links());
+        app.mode = crate::app::Mode::Add;
+        for label in ["Links", "Package name", "Save to", "Priority", "Autostart"] {
+            assert!(shows(&app, label), "missing field: {label}");
+        }
+    }
 }
