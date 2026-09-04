@@ -306,15 +306,57 @@ pub struct Field {
     pub hint: &'static str,
     pub kind: FieldKind,
     pub text: String,
+    /// Insertion point in `text`, in chars; text fields only.
+    pub cursor: usize,
     pub flag: bool,
 }
 
 impl Field {
     fn text(label: &'static str, hint: &'static str) -> Self {
-        Field { label, hint, kind: FieldKind::Text, text: String::new(), flag: false }
+        Field { label, hint, kind: FieldKind::Text, text: String::new(), cursor: 0, flag: false }
     }
     fn secret(label: &'static str) -> Self {
-        Field { label, hint: "", kind: FieldKind::Secret, text: String::new(), flag: false }
+        Field { label, hint: "", kind: FieldKind::Secret, text: String::new(), cursor: 0, flag: false }
+    }
+    /// Prefilled, with the cursor at the end.
+    fn with_text(mut self, text: &str) -> Self {
+        self.text = text.to_string();
+        self.cursor = self.text.chars().count();
+        self
+    }
+
+    fn editable(&self) -> bool {
+        matches!(self.kind, FieldKind::Text | FieldKind::Secret)
+    }
+
+    fn byte_at(&self, chars: usize) -> usize {
+        self.text.char_indices().nth(chars).map(|(i, _)| i).unwrap_or(self.text.len())
+    }
+
+    fn insert(&mut self, s: &str) {
+        let at = self.byte_at(self.cursor);
+        self.text.insert_str(at, s);
+        self.cursor += s.chars().count();
+    }
+
+    fn backspace(&mut self) {
+        if self.cursor > 0 {
+            let (from, to) = (self.byte_at(self.cursor - 1), self.byte_at(self.cursor));
+            self.text.replace_range(from..to, "");
+            self.cursor -= 1;
+        }
+    }
+
+    fn delete(&mut self) {
+        if self.cursor < self.text.chars().count() {
+            let (from, to) = (self.byte_at(self.cursor), self.byte_at(self.cursor + 1));
+            self.text.replace_range(from..to, "");
+        }
+    }
+
+    fn clear(&mut self) {
+        self.text.clear();
+        self.cursor = 0;
     }
 }
 
@@ -328,8 +370,7 @@ pub struct Form {
 
 impl Form {
     pub fn login(email: &str) -> Self {
-        let mut email_field = Field::text("Email", "your My.JDownloader account");
-        email_field.text = email.to_string();
+        let email_field = Field::text("Email", "your My.JDownloader account").with_text(email);
         Form {
             title: "Sign in to My.JDownloader",
             fields: vec![email_field, Field::secret("Password")],
@@ -346,22 +387,34 @@ impl Form {
                 Field::text("Save to", "leave empty for the default folder"),
                 Field::text("Extract password", ""),
                 Field::text("Download password", ""),
-                Field { label: "Priority", hint: "", kind: FieldKind::Choice, text: "DEFAULT".into(), flag: false },
-                Field { label: "Autostart", hint: "", kind: FieldKind::Flag, text: String::new(), flag: false },
+                Field {
+                    label: "Priority",
+                    hint: "",
+                    kind: FieldKind::Choice,
+                    text: "DEFAULT".into(),
+                    cursor: 0,
+                    flag: false,
+                },
+                Field {
+                    label: "Autostart",
+                    hint: "",
+                    kind: FieldKind::Flag,
+                    text: String::new(),
+                    cursor: 0,
+                    flag: false,
+                },
             ],
             index: 0,
         }
     }
 
     pub fn rename(current: &str) -> Self {
-        let mut name = Field::text("Name", "");
-        name.text = current.to_string();
+        let name = Field::text("Name", "").with_text(current);
         Form { title: "Rename", fields: vec![name], index: 0 }
     }
 
     pub fn directory(current: &str) -> Self {
-        let mut dir = Field::text("Save to", "absolute path on the JDownloader machine");
-        dir.text = current.to_string();
+        let dir = Field::text("Save to", "absolute path on the JDownloader machine").with_text(current);
         Form { title: "Download folder", fields: vec![dir], index: 0 }
     }
 
@@ -400,21 +453,38 @@ impl Form {
         self.index = (self.index + self.fields.len() - 1) % self.fields.len();
     }
 
+    /// Insert at the cursor of the active text field.
     pub fn type_str(&mut self, s: &str) {
         let f = &mut self.fields[self.index];
-        if matches!(f.kind, FieldKind::Text | FieldKind::Secret) {
-            f.text.push_str(s);
+        if f.editable() {
+            f.insert(s);
         }
     }
 
     pub fn backspace(&mut self) {
         let f = &mut self.fields[self.index];
-        if matches!(f.kind, FieldKind::Text | FieldKind::Secret) {
-            f.text.pop();
+        if f.editable() {
+            f.backspace();
         }
     }
 
-    /// Left/right on a choice cycles it; on a flag flips it.
+    pub fn delete(&mut self) {
+        let f = &mut self.fields[self.index];
+        if f.editable() {
+            f.delete();
+        }
+    }
+
+    /// Ctrl-U: empty the active text field.
+    pub fn clear(&mut self) {
+        let f = &mut self.fields[self.index];
+        if f.editable() {
+            f.clear();
+        }
+    }
+
+    /// Left/right: move the cursor of a text field; cycle a choice; flip
+    /// a flag.
     pub fn cycle(&mut self, delta: i32) {
         let f = &mut self.fields[self.index];
         match f.kind {
@@ -424,12 +494,69 @@ impl Form {
                 f.text = PRIORITIES[((i + delta).rem_euclid(n)) as usize].to_string();
             }
             FieldKind::Flag => f.flag = !f.flag,
-            _ => {}
+            FieldKind::Text | FieldKind::Secret => {
+                let len = f.text.chars().count();
+                f.cursor = if delta < 0 { f.cursor.saturating_sub(1) } else { (f.cursor + 1).min(len) };
+            }
         }
+    }
+
+    pub fn home(&mut self) {
+        self.fields[self.index].cursor = 0;
+    }
+
+    pub fn end(&mut self) {
+        let f = &mut self.fields[self.index];
+        f.cursor = f.text.chars().count();
     }
 
     pub fn is_valid(&self) -> bool {
         // The first field is the one that cannot be empty in both forms.
         !self.fields[0].text.trim().is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn text_fields_edit_at_the_cursor() {
+        let mut form = Form::rename("città");
+        assert_eq!(form.fields[0].cursor, 5);
+        form.cycle(-1);
+        form.cycle(-1);
+        form.type_str("XY");
+        assert_eq!(form.value("Name"), "citXYtà");
+        assert_eq!(form.fields[0].cursor, 5);
+        form.backspace();
+        assert_eq!(form.value("Name"), "citXtà");
+        form.delete();
+        assert_eq!(form.value("Name"), "citXà");
+        form.home();
+        form.delete();
+        assert_eq!(form.value("Name"), "itXà");
+        form.end();
+        form.type_str("!");
+        assert_eq!(form.value("Name"), "itXà!");
+        form.cycle(1);
+        assert_eq!(form.fields[0].cursor, 5, "cannot move past the end");
+        form.clear();
+        assert_eq!(form.value("Name"), "");
+        assert_eq!(form.fields[0].cursor, 0);
+    }
+
+    #[test]
+    fn choices_and_flags_ignore_typing() {
+        let mut form = Form::add_links();
+        form.index = form.fields.iter().position(|f| f.label == "Priority").unwrap();
+        form.type_str("x");
+        form.backspace();
+        assert_eq!(form.value("Priority"), "DEFAULT");
+        form.cycle(-1);
+        assert_eq!(form.value("Priority"), "HIGH");
+        form.index = form.fields.iter().position(|f| f.label == "Autostart").unwrap();
+        form.cycle(1);
+        assert!(form.flag("Autostart"));
     }
 }
