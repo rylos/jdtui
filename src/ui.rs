@@ -361,6 +361,7 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         let popup = centered(area, 90, form.fields.len() as u16 + 6);
         frame.render_widget(Clear, popup);
         let hint = match app.mode {
+            _ if form.active_label() == "Save to" => "Enter apply · Ctrl-F folders · Ctrl-U clear · Esc cancel",
             Mode::Add if form.is_valid() => "Enter add · Tab/↑↓ field · ←→ move / change · Esc cancel",
             Mode::Add => "Paste at least one url · Tab/↑↓ field · Esc cancel",
             Mode::Filter => "Enter keep · Esc clear",
@@ -388,6 +389,11 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
     if app.mode == Mode::Accounts {
         draw_list(frame, app, list_area);
         draw_accounts(frame, app, area);
+        return;
+    }
+    if app.mode == Mode::FolderChoice {
+        draw_list(frame, app, list_area);
+        draw_folders(frame, app, area);
         return;
     }
 
@@ -873,6 +879,23 @@ fn draw_urls(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(block, popup);
     let mut lines = vec![Line::raw("")];
     lines.extend(app.urls.iter().map(|u| Line::from(format!(" {u}"))));
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
+fn draw_folders(frame: &mut Frame, app: &App, area: Rect) {
+    let n = app.folders.len();
+    let height = (n as u16 + 4).min(area.height);
+    let popup = centered(area, area.width.saturating_sub(8).min(90), height);
+    frame.render_widget(Clear, popup);
+    let block = panel("Download folders", Some("Enter pick · Esc back"));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    let mut lines = vec![Line::raw("")];
+    lines.extend(app.folders.iter().enumerate().map(|(i, f)| {
+        let selected = i == app.folder_index;
+        let style = if selected { selected_style() } else { Style::new() };
+        Line::from(Span::styled(format!(" {} {f}", if selected { "›" } else { " " }), style))
+    }));
     frame.render_widget(Paragraph::new(lines), inner);
 }
 

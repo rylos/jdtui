@@ -184,6 +184,14 @@ impl RemoveMode {
     }
 }
 
+/// A mount point on the JDownloader machine.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct StorageInfo {
+    pub path: Option<String>,
+    pub free: Option<i64>,
+    pub size: Option<i64>,
+}
+
 /// One notification from the JDownloader event channel.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Event {
@@ -649,6 +657,17 @@ impl JdApi {
 
     pub fn unsubscribe_events(&mut self, subscription: i64) -> Result<()> {
         self.call_unit("/events/unsubscribe", &[json!(subscription)])
+    }
+
+    /// The download folders used lately, as the GUI's folder combo lists
+    /// them, placeholders such as `<jd:packagename>` included.
+    pub fn folder_history(&mut self) -> Result<Vec<String>> {
+        self.call("/linkgrabberv2/getDownloadFolderHistorySelectionBase", &[])
+    }
+
+    /// The mount points JDownloader sees, with their free space.
+    pub fn storage_roots(&mut self) -> Result<Vec<StorageInfo>> {
+        self.call("/system/getStorageInfos", &[Value::Null])
     }
 
     pub fn is_collecting(&mut self) -> Result<bool> {
