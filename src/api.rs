@@ -107,6 +107,9 @@ impl Link {
 #[derive(Debug, Clone, Default)]
 pub struct Snapshot {
     pub state: String,
+    /// Bytes per second, as the controller reports it: includes traffic
+    /// the per-link figures miss (rar extraction aside).
+    pub speed: i64,
     pub downloads: Vec<Package>,
     pub grabber: Vec<Package>,
 }
@@ -223,6 +226,10 @@ impl JdApi {
         self.call("/downloadcontroller/getCurrentState", &[])
     }
 
+    pub fn speed(&mut self) -> Result<i64> {
+        self.call("/downloadcontroller/getSpeedInBps", &[])
+    }
+
     pub fn downloads(&mut self) -> Result<Vec<Package>> {
         let packages: Vec<Package> = self.call(
             "/downloadsV2/queryPackages",
@@ -268,7 +275,12 @@ impl JdApi {
     }
 
     pub fn snapshot(&mut self) -> Result<Snapshot> {
-        Ok(Snapshot { state: self.state()?, downloads: self.downloads()?, grabber: self.grabber()? })
+        Ok(Snapshot {
+            state: self.state()?,
+            speed: self.speed()?,
+            downloads: self.downloads()?,
+            grabber: self.grabber()?,
+        })
     }
 
     // --- actions -------------------------------------------------------
