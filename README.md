@@ -49,6 +49,7 @@ another one, or start with `jdtui --choose-device`.
 | `e` | Add a password to the list tried on every archive |
 | `s` | Start / stop downloads |
 | `P` | Pause / resume downloads |
+| `A` | Premium accounts: enable, disable, refresh |
 | `d` | Switch to another JDownloader of the account |
 | `c` | Move the whole Link Grabber to the download list |
 | `C` | Clear the Link Grabber |
@@ -82,6 +83,11 @@ folder, extract and download passwords, priority and autostart. Pasting a list
 of urls works; newlines become separators.
 
 ![Adding links](docs/add-links.png)
+
+`A` lists the premium accounts of the JDownloader with their traffic and
+expiry, and lets you enable, disable or refresh them:
+
+![The accounts panel](docs/accounts.png)
 
 The **Link Grabber** tab shows what is waiting to be confirmed, with the
 availability and hoster of every link:

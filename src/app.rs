@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::api::{AddLinks, JdApi, RemoveMode, Snapshot, describe_error};
+use crate::api::{Account, AddLinks, JdApi, RemoveMode, Snapshot, describe_error};
 use crate::config::Config;
 use crate::model::{
     Action, Form, MenuEntry, PRIORITIES, Row, RowKey, Tab, build_rows, collect_ids, context_menu, describe,
@@ -53,6 +53,8 @@ pub enum Mode {
     Help,
     /// The urls of the selection, in `urls`.
     Urls,
+    /// The premium accounts of the JDownloader, in `accounts`.
+    Accounts,
 }
 
 /// Every key of the main screen, grouped for the help panel. The README's
@@ -98,6 +100,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
         &[
             ("s", "Start / stop downloads"),
             ("P", "Pause / resume downloads"),
+            ("A", "Accounts: enable, disable, refresh"),
             ("d", "Switch to another JDownloader of the account"),
         ],
     ),
@@ -147,6 +150,9 @@ pub struct App {
 
     /// Urls shown by `Mode::Urls`.
     pub urls: Vec<String>,
+    /// Accounts shown by `Mode::Accounts`, fetched when the panel opens.
+    pub accounts: Vec<Account>,
+    pub account_index: usize,
     /// Text to put on the system clipboard at the next frame; the binary
     /// sends it as an OSC 52 sequence, the only way out of a remote shell.
     pub clipboard: Option<String>,
@@ -180,6 +186,8 @@ impl App {
             priority_index: 0,
             form: None,
             urls: Vec::new(),
+            accounts: Vec::new(),
+            account_index: 0,
             clipboard: None,
             message: None,
             refresh_error: None,
@@ -217,6 +225,8 @@ impl App {
             priority_index: 0,
             form: None,
             urls: Vec::new(),
+            accounts: Vec::new(),
+            account_index: 0,
             clipboard: None,
             message: None,
             refresh_error: None,
@@ -600,6 +610,63 @@ impl App {
         self.finish(outcome);
     }
 
+    // --- accounts ------------------------------------------------------
+
+    fn open_accounts(&mut self) {
+        match self.with_api(|a| a.accounts()) {
+            Ok(accounts) => {
+                self.account_index = self.account_index.min(accounts.len().saturating_sub(1));
+                self.accounts = accounts;
+                self.mode = Mode::Accounts;
+            }
+            Err(e) => self.message = Some((format!("Could not list accounts: {e}"), true)),
+        }
+    }
+
+    fn handle_accounts_key(&mut self, key: Key) {
+        let n = self.accounts.len();
+        match key {
+            Key::Esc | Key::Char('q' | 'A') => {
+                self.mode = Mode::List;
+                self.message = None;
+            }
+            Key::Up | Key::Char('k') => self.account_index = self.account_index.saturating_sub(1),
+            Key::Down | Key::Char('j') => self.account_index = (self.account_index + 1).min(n.saturating_sub(1)),
+            Key::Enter | Key::Char(' ' | 'e') => {
+                let Some(acc) = self.accounts.get(self.account_index) else { return };
+                let (id, enable) = (acc.uuid, !acc.enabled.unwrap_or(false));
+                let who = acc.hostname.clone().unwrap_or_default();
+                let outcome = self
+                    .with_api(|a| a.set_accounts_enabled(enable, &[id]))
+                    .map(|_| format!("{who} {}", if enable { "enabled" } else { "disabled" }));
+                self.account_outcome(outcome);
+            }
+            Key::Char('r') => {
+                let Some(acc) = self.accounts.get(self.account_index) else { return };
+                let (id, who) = (acc.uuid, acc.hostname.clone().unwrap_or_default());
+                let outcome = self.with_api(|a| a.refresh_accounts(&[id])).map(|_| format!("{who} refreshed"));
+                self.account_outcome(outcome);
+            }
+            Key::Char('R') => {
+                let ids: Vec<i64> = self.accounts.iter().map(|a| a.uuid).collect();
+                let outcome = self.with_api(|a| a.refresh_accounts(&ids)).map(|_| "All accounts refreshed".into());
+                self.account_outcome(outcome);
+            }
+            _ => {}
+        }
+    }
+
+    /// Report, then reload the list so the panel shows the new state.
+    fn account_outcome(&mut self, outcome: Result<String, String>) {
+        match outcome {
+            Ok(msg) => self.message = Some((msg, false)),
+            Err(e) => self.message = Some((format!("Failed: {e}"), true)),
+        }
+        if let Ok(accounts) = self.with_api(|a| a.accounts()) {
+            self.accounts = accounts;
+        }
+    }
+
     /// Fetch the urls of the selection, show them and copy them.
     fn copy_urls(&mut self) {
         let targets = self.target_rows();
@@ -759,6 +826,7 @@ impl App {
                         self.message = None;
                     }
                 }
+                Mode::Accounts => self.handle_accounts_key(key),
             },
         }
     }
@@ -871,6 +939,7 @@ impl App {
             Key::Char('P') => self.toggle_pause(),
             Key::Char('t') if !self.tab.is_grabber() => self.toggle_stop_mark(),
             Key::Char('d') => self.choose_device(),
+            Key::Char('A') => self.open_accounts(),
             Key::Char('e') => {
                 self.form = Some(Form::archive_password());
                 self.mode = Mode::ArchivePassword;

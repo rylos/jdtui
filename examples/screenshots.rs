@@ -9,7 +9,7 @@
 use std::fmt::Write as _;
 use std::fs;
 
-use jdtui::api::{ArchiveStatus, Link, Package, RemoveMode, Snapshot};
+use jdtui::api::{Account, ArchiveStatus, Link, Package, RemoveMode, Snapshot};
 use jdtui::app::{App, Mode};
 use jdtui::model::{Action, Form, Tab, build_rows, context_menu};
 use jdtui::ui;
@@ -339,6 +339,43 @@ fn main() {
     app.expanded.insert(4);
     app.rows = build_rows(&app.snapshot.grabber, &app.expanded);
     shot("link-grabber", &app);
+
+    // The accounts panel.
+    let mut app = base();
+    app.accounts = vec![
+        Account {
+            uuid: 1,
+            hostname: Some("mirror.example.org".into()),
+            username: Some("someone".into()),
+            enabled: Some(true),
+            valid: Some(true),
+            valid_until: Some(1_790_000_000_000),
+            traffic_left: Some(38 * GB),
+            traffic_max: Some(50 * GB),
+            ..Default::default()
+        },
+        Account {
+            uuid: 2,
+            hostname: Some("files.example.net".into()),
+            username: Some("someone".into()),
+            enabled: Some(true),
+            valid: Some(false),
+            error_string: Some("Premium expired".into()),
+            traffic_left: Some(-1),
+            ..Default::default()
+        },
+        Account {
+            uuid: 3,
+            hostname: Some("cdn.example.com".into()),
+            username: Some("someone@example.com".into()),
+            enabled: Some(false),
+            traffic_left: Some(-1),
+            ..Default::default()
+        },
+    ];
+    app.account_index = 1;
+    app.mode = Mode::Accounts;
+    shot("accounts", &app);
 
     // The key reference.
     let mut app = base();
