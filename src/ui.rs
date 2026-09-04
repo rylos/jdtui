@@ -232,7 +232,7 @@ fn draw_main(frame: &mut Frame, app: &App) {
 
 fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
     let dl = &app.snapshot.downloads;
-    let speed: i64 = dl.iter().filter_map(|p| p.speed).sum();
+    let speed = app.snapshot.speed;
     let total: i64 = dl.iter().filter_map(|p| p.bytes_total).sum();
     let loaded: i64 = dl.iter().filter_map(|p| p.bytes_loaded).sum();
     let running = dl.iter().filter(|p| p.is_running()).count();
@@ -800,7 +800,7 @@ mod tests {
             links: vec![link],
             ..Default::default()
         };
-        Snapshot { state: "IDLE".into(), downloads: vec![package], grabber: Vec::new() }
+        Snapshot { state: "IDLE".into(), speed: 0, downloads: vec![package], grabber: Vec::new() }
     }
 
     /// The whole frame as text, one string per row.

@@ -260,7 +260,12 @@ fn demo() -> Snapshot {
         ..Default::default()
     };
 
-    Snapshot { state: "RUNNING".into(), downloads: vec![finished, running, queued], grabber: vec![grabbed] }
+    Snapshot {
+        state: "RUNNING".into(),
+        speed: 11 * 1024 * 1024,
+        downloads: vec![finished, running, queued],
+        grabber: vec![grabbed],
+    }
 }
 
 fn base() -> App {
