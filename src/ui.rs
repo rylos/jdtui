@@ -401,7 +401,9 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
 
     if app.mode == Mode::Help {
         draw_list(frame, app, list_area);
-        draw_help(frame, area);
+        // Everything but the footer, so 24 rows hold the whole list.
+        let whole = frame.area();
+        draw_help(frame, Rect::new(whole.x, whole.y, whole.width, whole.height.saturating_sub(1)));
         return;
     }
     if app.mode == Mode::Urls {
@@ -496,6 +498,8 @@ fn draw_list(frame: &mut Frame, app: &App, area: Rect) {
         .block(block)
         .column_spacing(1)
         .row_highlight_style(selected_style());
+    // Inner height minus the header row: what a page is.
+    app.page.set(area.height.saturating_sub(3).max(1) as usize);
     let mut state = TableState::default().with_selected(Some(app.cursor));
     frame.render_stateful_widget(table, area, &mut state);
 }
@@ -835,37 +839,48 @@ fn draw_properties(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(table, inner);
 }
 
+/// The key reference, over the whole frame but the footer: the sections
+/// go in two columns when the terminal is wide enough, the key column of
+/// each sized to its own keys, and blank lines between sections only when
+/// the height allows.
 fn draw_help(frame: &mut Frame, area: Rect) {
-    let key_width = HELP.iter().flat_map(|(_, keys)| keys.iter()).map(|(k, _)| k.chars().count()).max().unwrap_or(8);
-    let section_lines = |section: &str, keys: &[(&str, &str)]| -> Vec<Line<'static>> {
-        let mut lines = vec![Line::from(Span::styled(format!(" {section}"), Style::new().fg(accent()).bold()))];
-        for (key, what) in keys {
-            lines.push(Line::from(vec![
-                Span::styled(format!("   {key:<w$}  ", w = key_width), Style::new().bold()),
-                Span::raw(what.to_string()),
-            ]));
-        }
-        lines
-    };
-
-    // Two columns when the terminal is wide enough, one otherwise; a blank
-    // line between sections only when the columns still fit the height.
     let two_columns = area.width >= 120;
     let available = area.height.saturating_sub(4) as usize;
-    let layout = |gap: usize| -> Vec<Vec<Line<'static>>> {
-        let mut columns: Vec<Vec<Line>> = vec![Vec::new(), Vec::new()];
+    // Which sections go to which column: split where the line count halves.
+    let split = |gap: usize| -> Vec<Vec<usize>> {
+        let mut columns: Vec<Vec<usize>> = vec![Vec::new(), Vec::new()];
         let total: usize = HELP.iter().map(|(_, k)| k.len() + 1 + gap).sum();
         let mut filled = 0;
-        for (section, keys) in HELP {
-            let size = keys.len() + 1 + gap;
+        for (i, (_, keys)) in HELP.iter().enumerate() {
             let col = if two_columns && filled >= total.div_ceil(2) { 1 } else { 0 };
-            if !columns[col].is_empty() {
-                columns[col].extend(std::iter::repeat_n(Line::raw(""), gap));
-            }
-            columns[col].extend(section_lines(section, keys));
-            filled += size;
+            columns[col].push(i);
+            filled += keys.len() + 1 + gap;
         }
         columns
+    };
+    let layout = |gap: usize| -> Vec<Vec<Line<'static>>> {
+        split(gap)
+            .into_iter()
+            .map(|sections| {
+                let key_width =
+                    sections.iter().flat_map(|&i| HELP[i].1.iter()).map(|(k, _)| k.chars().count()).max().unwrap_or(8);
+                let mut lines: Vec<Line> = Vec::new();
+                for &i in &sections {
+                    let (section, keys) = HELP[i];
+                    if !lines.is_empty() {
+                        lines.extend(std::iter::repeat_n(Line::raw(""), gap));
+                    }
+                    lines.push(Line::from(Span::styled(format!(" {section}"), Style::new().fg(accent()).bold())));
+                    for (key, what) in keys {
+                        lines.push(Line::from(vec![
+                            Span::styled(format!("   {key:<w$}  ", w = key_width), Style::new().bold()),
+                            Span::raw(what.to_string()),
+                        ]));
+                    }
+                }
+                lines
+            })
+            .collect()
     };
     let tallest = |columns: &[Vec<Line>]| columns.iter().map(|c| c.len()).max().unwrap_or(0);
     let mut columns = layout(1);

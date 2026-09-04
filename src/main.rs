@@ -127,6 +127,8 @@ fn translate(code: KeyCode, modifiers: KeyModifiers) -> Option<Key> {
         KeyCode::Home => Key::Home,
         KeyCode::End => Key::End,
         KeyCode::Delete => Key::Delete,
+        KeyCode::PageUp => Key::PageUp,
+        KeyCode::PageDown => Key::PageDown,
         KeyCode::Char(c) => Key::Char(c),
         KeyCode::Enter => Key::Enter,
         KeyCode::Esc => Key::Esc,

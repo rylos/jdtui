@@ -72,8 +72,10 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
     (
         "Navigation",
         &[
-            ("Tab", "Switch between Downloads and Link Grabber"),
+            ("Tab", "Switch between the two tabs"),
             ("↑ ↓  k j", "Move the cursor"),
+            ("PgUp PgDn", "Move by a page"),
+            ("Home End  g G", "First / last row"),
             ("→ ←", "Expand / collapse a package"),
             ("/", "Filter rows by name, hoster or status"),
         ],
@@ -138,6 +140,8 @@ pub enum Key {
     CtrlU,
     /// Ctrl-F: the folder picker, on a "Save to" field.
     CtrlF,
+    PageUp,
+    PageDown,
 }
 
 pub struct App {
@@ -159,6 +163,9 @@ pub struct App {
     pub marked: HashSet<RowKey>,
     /// Substring the rows are filtered by; empty shows everything.
     pub filter: String,
+    /// Rows the list shows at once, told by the drawing code so PageUp and
+    /// PageDown move by what is on screen.
+    pub page: std::cell::Cell<usize>,
 
     pub menu: Vec<MenuEntry>,
     pub menu_index: usize,
@@ -215,6 +222,7 @@ impl App {
             expanded: HashSet::new(),
             marked: HashSet::new(),
             filter: String::new(),
+            page: std::cell::Cell::new(20),
             menu: Vec::new(),
             menu_index: 0,
             remove_index: 0,
@@ -262,6 +270,7 @@ impl App {
             expanded: HashSet::new(),
             marked: HashSet::new(),
             filter: String::new(),
+            page: std::cell::Cell::new(20),
             menu: Vec::new(),
             menu_index: 0,
             remove_index: 0,
@@ -1060,6 +1069,12 @@ impl App {
             Key::Down | Key::Char('j') => {
                 self.cursor = (self.cursor + 1).min(self.rows.len().saturating_sub(1));
             }
+            Key::PageUp => self.cursor = self.cursor.saturating_sub(self.page.get().max(1)),
+            Key::PageDown => {
+                self.cursor = (self.cursor + self.page.get().max(1)).min(self.rows.len().saturating_sub(1))
+            }
+            Key::Home | Key::Char('g') => self.cursor = 0,
+            Key::End | Key::Char('G') => self.cursor = self.rows.len().saturating_sub(1),
             Key::Right => {
                 if let Some(row) = self.current_row() {
                     self.toggle_expand(row);
