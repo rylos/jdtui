@@ -7,8 +7,8 @@ use std::time::Duration;
 use crate::api::{AddLinks, JdApi, RemoveMode, Snapshot, describe_error};
 use crate::config::Config;
 use crate::model::{
-    Action, Form, MenuEntry, Row, RowKey, Tab, build_rows, collect_ids, context_menu, describe, packages_of, row_key,
-    row_name,
+    Action, Form, MenuEntry, PRIORITIES, Row, RowKey, Tab, build_rows, collect_ids, context_menu, describe,
+    packages_of, row_key, row_name, row_priority,
 };
 use crate::myjd::{Device, MyJd};
 use crate::poller::{Poller, Update};
@@ -38,6 +38,8 @@ pub enum Mode {
     Confirm(Action),
     /// Choosing what happens to the files of the packages being removed.
     RemoveChoice,
+    /// Choosing a priority for the selection.
+    PriorityChoice,
     Add,
     /// The full key reference; the footer only shows the frequent ones.
     Help,
@@ -119,6 +121,8 @@ pub struct App {
     pub menu_index: usize,
     /// Highlighted entry of the remove-choice panel.
     pub remove_index: usize,
+    /// Highlighted entry of the priority panel, an index into `PRIORITIES`.
+    pub priority_index: usize,
     pub form: Option<Form>,
 
     /// Footer message and whether it is an error.
@@ -147,6 +151,7 @@ impl App {
             menu: Vec::new(),
             menu_index: 0,
             remove_index: 0,
+            priority_index: 0,
             form: None,
             message: None,
             refresh_error: None,
@@ -181,6 +186,7 @@ impl App {
             menu: Vec::new(),
             menu_index: 0,
             remove_index: 0,
+            priority_index: 0,
             form: None,
             message: None,
             refresh_error: None,
@@ -364,6 +370,13 @@ impl App {
                 self.mode = Mode::Properties;
                 return;
             }
+            Action::Priority => {
+                // Start from the current priority when there is one row.
+                let current = if targets.len() == 1 { row_priority(self.packages(), &targets[0]) } else { None };
+                self.priority_index = PRIORITIES.iter().position(|p| Some(*p) == current).unwrap_or(3);
+                self.mode = Mode::PriorityChoice;
+                return;
+            }
             _ => {}
         }
 
@@ -394,7 +407,10 @@ impl App {
             Action::MoveToDownloads => self
                 .with_api(|a| a.move_to_downloads(&links, &pkgs))
                 .map(|_| format!("{what} moved to the download list")),
-            Action::ToggleExpand | Action::Properties => unreachable!(),
+            Action::PriorityTo(priority) => self
+                .with_api(|a| a.set_priority(priority, &links, &pkgs, grabber))
+                .map(|_| format!("{what} set to priority {}", priority.to_lowercase())),
+            Action::ToggleExpand | Action::Properties | Action::Priority => unreachable!(),
         };
         self.finish(outcome);
     }
@@ -493,6 +509,20 @@ impl App {
                         } else {
                             self.run_action(Action::RemoveWith(mode));
                         }
+                    }
+                    _ => {}
+                },
+                Mode::PriorityChoice => match key {
+                    Key::Esc | Key::Left | Key::Char('q') => {
+                        self.mode = Mode::List;
+                        self.message = Some(("Cancelled".into(), false));
+                    }
+                    Key::Up | Key::Char('k') => self.priority_index = self.priority_index.saturating_sub(1),
+                    Key::Down | Key::Char('j') => {
+                        self.priority_index = (self.priority_index + 1).min(PRIORITIES.len() - 1)
+                    }
+                    Key::Enter | Key::Right | Key::Char(' ') => {
+                        self.run_action(Action::PriorityTo(PRIORITIES[self.priority_index]))
                     }
                     _ => {}
                 },

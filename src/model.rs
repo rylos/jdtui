@@ -81,6 +81,13 @@ pub fn row_name<'a>(packages: &'a [Package], row: &Row) -> &'a str {
     }
 }
 
+pub fn row_priority<'a>(packages: &'a [Package], row: &Row) -> Option<&'a str> {
+    match row.link {
+        None => packages[row.package].priority.as_deref(),
+        Some(l) => packages[row.package].links[l].priority.as_deref(),
+    }
+}
+
 pub fn row_enabled(packages: &[Package], row: &Row) -> bool {
     match row.link {
         None => packages[row.package].is_enabled(),
@@ -131,6 +138,10 @@ pub enum Action {
     /// Remove, having decided about the files.
     RemoveWith(RemoveMode),
     MoveToDownloads,
+    /// Open the priority chooser.
+    Priority,
+    /// Apply a priority, one of `PRIORITIES`.
+    PriorityTo(&'static str),
     Properties,
 }
 
@@ -171,6 +182,8 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row]) -> Vec<MenuEnt
         v.push(entry(format!("Remove{suffix}"), Action::Remove, true));
         v
     };
+    let before_remove = entries.len() - 1;
+    entries.insert(before_remove, entry("Set priority…", Action::Priority, false));
 
     if single && rows[0].is_package() {
         entries.insert(0, entry("Collapse / Expand", Action::ToggleExpand, false));
