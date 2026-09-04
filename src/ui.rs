@@ -290,7 +290,11 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
     let titles = vec![
         Line::from(format!(" Downloads ({}) ", app.snapshot.downloads.len())),
-        Line::from(format!(" Link Grabber ({}) ", app.snapshot.grabber.len())),
+        Line::from(format!(
+            " Link Grabber ({}){} ",
+            app.snapshot.grabber.len(),
+            if app.snapshot.collecting { " · crawling…" } else { "" }
+        )),
     ];
     let tabs = Tabs::new(titles)
         .select(if app.tab == Tab::Downloads { 0 } else { 1 })
@@ -739,19 +743,28 @@ fn draw_help(frame: &mut Frame, area: Rect) {
         lines
     };
 
-    // Two columns when the terminal is wide enough, so 24 rows are enough
-    // to show everything; one otherwise.
+    // Two columns when the terminal is wide enough, one otherwise; a blank
+    // line between sections only when the columns still fit the height.
     let two_columns = area.width >= 120;
-    let mut columns: Vec<Vec<Line>> = vec![Vec::new(), Vec::new()];
-    let total: usize = HELP.iter().map(|(_, k)| k.len() + 2).sum();
-    let mut filled = 0;
-    for (section, keys) in HELP {
-        let col = if two_columns && filled + keys.len() + 2 > total / 2 { 1 } else { 0 };
-        if !columns[col].is_empty() {
-            columns[col].push(Line::raw(""));
+    let available = area.height.saturating_sub(4) as usize;
+    let layout = |gap: usize| -> Vec<Vec<Line<'static>>> {
+        let mut columns: Vec<Vec<Line>> = vec![Vec::new(), Vec::new()];
+        let total: usize = HELP.iter().map(|(_, k)| k.len() + 1 + gap).sum();
+        let mut filled = 0;
+        for (section, keys) in HELP {
+            let size = keys.len() + 1 + gap;
+            let col = if two_columns && filled >= total.div_ceil(2) { 1 } else { 0 };
+            if !columns[col].is_empty() {
+                columns[col].extend(std::iter::repeat_n(Line::raw(""), gap));
+            }
+            columns[col].extend(section_lines(section, keys));
+            filled += size;
         }
-        columns[col].extend(section_lines(section, keys));
-        filled += keys.len() + 2;
+        columns
+    };
+    let mut columns = layout(1);
+    if columns.iter().map(|c| c.len()).max().unwrap_or(0) > available {
+        columns = layout(0);
     }
 
     let column_width = 58u16;

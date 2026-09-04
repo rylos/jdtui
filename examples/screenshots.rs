@@ -264,6 +264,7 @@ fn demo() -> Snapshot {
         state: "RUNNING".into(),
         speed: 11 * 1024 * 1024,
         stop_mark: Some(207),
+        collecting: true,
         downloads: vec![finished, running, queued],
         grabber: vec![grabbed],
     }
