@@ -131,6 +131,8 @@ pub enum Action {
     ToggleExpand,
     ToggleEnabled,
     Force,
+    /// Continue interrupted links from where they stopped.
+    Resume,
     Reset,
     Cleanup,
     /// Ask what to do with the files first, on the downloads tab.
@@ -177,6 +179,7 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row]) -> Vec<MenuEnt
     } else {
         let mut v = vec![
             entry(format!("Force download{suffix}"), Action::Force, false),
+            entry(format!("Resume{suffix}"), Action::Resume, false),
             toggle,
             entry(format!("Reset{suffix}"), Action::Reset, true),
         ];

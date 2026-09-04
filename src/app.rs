@@ -407,6 +407,7 @@ impl App {
             Action::Force => {
                 self.with_api(|a| a.force_download(&links, &pkgs)).map(|_| format!("{what} forced to start"))
             }
+            Action::Resume => self.with_api(|a| a.resume(&links, &pkgs)).map(|_| format!("{what} resumed")),
             Action::Reset => self.with_api(|a| a.reset(&links, &pkgs)).map(|_| format!("{what} reset")),
             Action::Remove => self.with_api(|a| a.remove(&links, &pkgs, grabber)).map(|_| format!("{what} removed")),
             Action::RemoveWith(mode) => {
