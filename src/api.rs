@@ -112,6 +112,8 @@ pub struct Snapshot {
     pub speed: i64,
     /// Uuid of the link or package downloads stop after, if set.
     pub stop_mark: Option<i64>,
+    /// The Link Grabber is still crawling what was added.
+    pub collecting: bool,
     pub downloads: Vec<Package>,
     pub grabber: Vec<Package>,
 }
@@ -281,6 +283,7 @@ impl JdApi {
             state: self.state()?,
             speed: self.speed()?,
             stop_mark: self.stop_mark()?,
+            collecting: self.is_collecting()?,
             downloads: self.downloads()?,
             grabber: self.grabber()?,
         })

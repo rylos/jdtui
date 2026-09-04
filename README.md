@@ -49,6 +49,8 @@ another one, or start with `jdtui --choose-device`.
 | `P` | Pause / resume downloads |
 | `d` | Switch to another JDownloader of the account |
 | `c` | Move the whole Link Grabber to the download list |
+| `C` | Clear the Link Grabber |
+| `x` | Abort link crawling |
 | `?` | Show every key |
 | `q` | Quit |
 

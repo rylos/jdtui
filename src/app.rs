@@ -75,7 +75,14 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
             ("p", "Properties of the selected row"),
             ("n", "Add links to the Link Grabber"),
             ("t", "Stop after this row (again to clear)"),
+        ],
+    ),
+    (
+        "Link Grabber",
+        &[
             ("c", "Move the whole Link Grabber to downloads"),
+            ("C", "Clear the Link Grabber"),
+            ("x", "Abort link crawling"),
         ],
     ),
     (
@@ -359,6 +366,11 @@ impl App {
     }
 
     fn run_action(&mut self, action: Action) {
+        if action == Action::ClearGrabber {
+            let outcome = self.with_api(|a| a.clear_grabber()).map(|_| "Link Grabber cleared".to_string());
+            self.finish(outcome);
+            return;
+        }
         let targets = self.target_rows();
         if targets.is_empty() {
             return;
@@ -436,7 +448,8 @@ impl App {
             | Action::Priority
             | Action::Rename
             | Action::Directory
-            | Action::ToggleStopMark => unreachable!(),
+            | Action::ToggleStopMark
+            | Action::ClearGrabber => unreachable!(),
         };
         self.finish(outcome);
     }
@@ -748,6 +761,26 @@ impl App {
             Key::Char('t') if !self.tab.is_grabber() => self.toggle_stop_mark(),
             Key::Char('d') => self.choose_device(),
             Key::Char('?' | 'h') => self.mode = Mode::Help,
+            Key::Char('C') if self.tab.is_grabber() => {
+                if self.snapshot.grabber.is_empty() {
+                    self.message = Some(("Link Grabber is empty".into(), true));
+                } else {
+                    let n = self.snapshot.grabber.len();
+                    self.message = Some((
+                        format!("Clear the Link Grabber ({n} package{})?  [y/N]", if n == 1 { "" } else { "s" }),
+                        false,
+                    ));
+                    self.mode = Mode::Confirm(Action::ClearGrabber);
+                }
+            }
+            Key::Char('x') if self.tab.is_grabber() => {
+                let outcome = if self.snapshot.collecting {
+                    self.with_api(|a| a.abort_collecting()).map(|_| "Link crawling aborted".to_string())
+                } else {
+                    Err("nothing is being crawled".to_string())
+                };
+                self.finish(outcome);
+            }
             Key::Char('c') if self.tab.is_grabber() => {
                 let pkgs: Vec<i64> = self.snapshot.grabber.iter().map(|p| p.uuid).collect();
                 if pkgs.is_empty() {

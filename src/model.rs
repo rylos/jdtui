@@ -160,6 +160,8 @@ pub enum Action {
     /// Remove, having decided about the files.
     RemoveWith(RemoveMode),
     MoveToDownloads,
+    /// Empty the Link Grabber; ignores the selection.
+    ClearGrabber,
     /// Open the priority chooser.
     Priority,
     /// Apply a priority, one of `PRIORITIES`.
