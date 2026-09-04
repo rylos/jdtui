@@ -111,6 +111,41 @@ pub struct Snapshot {
     pub grabber: Vec<Package>,
 }
 
+/// What to do with the files of a package being removed, mirroring the
+/// three choices the desktop GUI offers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RemoveMode {
+    /// Take it off the list, leave the files where they are.
+    ListOnly,
+    /// Move the files to the system recycle bin.
+    Recycle,
+    /// Delete the files for good.
+    DeleteFiles,
+}
+
+impl RemoveMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RemoveMode::ListOnly => "REMOVE_LINKS_ONLY",
+            RemoveMode::Recycle => "REMOVE_LINKS_AND_RECYCLE_FILES",
+            RemoveMode::DeleteFiles => "REMOVE_LINKS_AND_DELETE_FILES",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            RemoveMode::ListOnly => "Remove from the list only",
+            RemoveMode::Recycle => "Remove and move files to the recycle bin",
+            RemoveMode::DeleteFiles => "Remove and delete files from disk",
+        }
+    }
+
+    /// Whether it touches data on disk.
+    pub fn touches_files(self) -> bool {
+        self != RemoveMode::ListOnly
+    }
+}
+
 /// The GUI's "add links" dialog, field by field.
 #[derive(Debug, Clone, Default)]
 pub struct AddLinks {
@@ -254,6 +289,16 @@ impl JdApi {
         self.call_unit(path, &[json!(links), json!(packages)])
     }
 
+    /// Remove from the download list, deciding what happens to the files
+    /// already on disk. `removeLinks` always keeps them, so this goes through
+    /// cleanup, which is what the GUI's delete dialog does.
+    pub fn remove_with_files(&mut self, links: &[i64], packages: &[i64], mode: RemoveMode) -> Result<()> {
+        self.call_unit(
+            "/downloadsV2/cleanup",
+            &[json!(links), json!(packages), json!("DELETE_ALL"), json!(mode.as_str()), json!("SELECTED")],
+        )
+    }
+
     /// Delete the finished entries of the selection, like the GUI's Cleanup.
     pub fn cleanup_finished(&mut self, links: &[i64], packages: &[i64]) -> Result<()> {
         self.call_unit(
@@ -300,5 +345,65 @@ pub fn describe_error(e: &Error) -> String {
     match e {
         Error::Api { kind, .. } if kind == "OFFLINE" => "device is offline".to_string(),
         other => other.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod live {
+    //! Exercises the real service against a throwaway package it creates and
+    //! removes itself. Run with `cargo test -- --ignored --nocapture`.
+    use super::*;
+    use crate::myjd::MyJd;
+
+    fn api_for(device_name: &str) -> JdApi {
+        let cfg = crate::config::Config::load().expect("config");
+        let (email, password) = (cfg.email.expect("email"), cfg.password.expect("password"));
+        let mut myjd = MyJd::new(&email, &password);
+        myjd.connect().expect("connect");
+        let devices = myjd.list_devices().expect("devices");
+        let device = devices.iter().find(|d| d.name == device_name).expect("device not found").clone();
+        JdApi::new(myjd, device.id)
+    }
+
+    fn wait_for<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
+        for _ in 0..30 {
+            if let Some(v) = f() {
+                return v;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+        panic!("timed out waiting for {what}");
+    }
+
+    #[test]
+    #[ignore]
+    fn remove_with_delete_files_is_accepted() {
+        const NAME: &str = "jdtui-remove-test";
+        let mut api = api_for("jd2@docker");
+
+        api.add_links(&AddLinks {
+            links: "http://example.com/jdtui-remove-test.bin".into(),
+            package_name: NAME.into(),
+            ..Default::default()
+        })
+        .expect("add links");
+
+        let uuid = wait_for("the package to appear in the grabber", || {
+            api.grabber().ok()?.into_iter().find(|p| p.name == NAME).map(|p| p.uuid)
+        });
+        println!("created in the link grabber: {NAME} ({uuid})");
+
+        api.move_to_downloads(&[], &[uuid]).expect("move to downloads");
+        let uuid = wait_for("the package to reach the download list", || {
+            api.downloads().ok()?.into_iter().find(|p| p.name == NAME).map(|p| p.uuid)
+        });
+        println!("moved to the download list: {uuid}");
+
+        api.remove_with_files(&[], &[uuid], RemoveMode::DeleteFiles).expect("remove with delete files");
+        wait_for("the package to disappear", || api.downloads().ok()?.iter().all(|p| p.name != NAME).then_some(()));
+        println!("removed with REMOVE_LINKS_AND_DELETE_FILES, gone from the list");
+
+        // Nothing of ours must be left behind in either list.
+        assert!(api.grabber().unwrap().iter().all(|p| p.name != NAME));
     }
 }
