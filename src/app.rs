@@ -8,7 +8,7 @@ use crate::api::{Account, AddLinks, JdApi, RemoveMode, Snapshot, describe_error}
 use crate::config::Config;
 use crate::model::{
     Action, Form, MenuEntry, PRIORITIES, Row, RowKey, Tab, build_rows, collect_ids, context_menu, describe,
-    packages_of, row_key, row_name, row_priority, row_stop_marked, stop_mark_target,
+    device_menu, packages_of, row_key, row_name, row_priority, row_stop_marked, stop_mark_target,
 };
 use crate::myjd::{Device, MyJd};
 use crate::poller::{Poller, Update};
@@ -55,6 +55,8 @@ pub enum Mode {
     Urls,
     /// The premium accounts of the JDownloader, in `accounts`.
     Accounts,
+    /// Actions on the JDownloader itself, in `menu`.
+    DeviceMenu,
 }
 
 /// Every key of the main screen, grouped for the help panel. The README's
@@ -101,6 +103,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
             ("s", "Start / stop downloads"),
             ("P", "Pause / resume downloads"),
             ("A", "Accounts: enable, disable, refresh"),
+            ("D", "Updates, restart, reconnect, exit"),
             ("d", "Switch to another JDownloader of the account"),
         ],
     ),
@@ -394,6 +397,9 @@ impl App {
     }
 
     fn run_action(&mut self, action: Action) {
+        if action.is_device() {
+            return self.run_device_action(action);
+        }
         if action == Action::ClearGrabber {
             let outcome = self.with_api(|a| a.clear_grabber()).map(|_| "Link Grabber cleared".to_string());
             self.finish(outcome);
@@ -498,9 +504,40 @@ impl App {
             | Action::ToggleStopMark
             | Action::ClearGrabber
             | Action::NewPackage
-            | Action::Urls => unreachable!(),
+            | Action::Urls
+            | Action::CheckUpdate
+            | Action::UpdateAndRestart
+            | Action::RestartJd
+            | Action::ExitJd
+            | Action::Reconnect => unreachable!(),
         };
         self.finish(outcome);
+    }
+
+    fn run_device_action(&mut self, action: Action) {
+        let outcome = match action {
+            Action::CheckUpdate => self.with_api(|a| {
+                a.run_update_check()?;
+                a.update_available()
+            }),
+            Action::UpdateAndRestart => self.with_api(|a| a.update_and_restart()).map(|_| false),
+            Action::RestartJd => self.with_api(|a| a.restart_jd()).map(|_| false),
+            Action::ExitJd => self.with_api(|a| a.exit_jd()).map(|_| false),
+            Action::Reconnect => self.with_api(|a| a.reconnect()).map(|_| false),
+            _ => unreachable!(),
+        };
+        let outcome = outcome.map(|available| match action {
+            Action::CheckUpdate if available => "An update is available: use 'Update and restart'".to_string(),
+            Action::CheckUpdate => "JDownloader is up to date".to_string(),
+            Action::UpdateAndRestart => "JDownloader is updating and restarting".to_string(),
+            Action::RestartJd => "JDownloader is restarting".to_string(),
+            Action::ExitJd => "JDownloader is exiting".to_string(),
+            _ => "Reconnect started".to_string(),
+        });
+        // Not a selection action: keep the marks.
+        let marked = std::mem::take(&mut self.marked);
+        self.finish(outcome);
+        self.marked = marked;
     }
 
     fn finish(&mut self, outcome: Result<String, String>) {
@@ -763,7 +800,7 @@ impl App {
             Screen::Devices { .. } => self.handle_devices_key(key),
             Screen::Main => match self.mode {
                 Mode::List => self.handle_list_key(key),
-                Mode::Menu => self.handle_menu_key(key),
+                Mode::Menu | Mode::DeviceMenu => self.handle_menu_key(key),
                 Mode::Properties => {
                     if matches!(key, Key::Esc | Key::Enter | Key::Char('q' | 'p')) {
                         self.mode = Mode::List;
@@ -940,6 +977,11 @@ impl App {
             Key::Char('t') if !self.tab.is_grabber() => self.toggle_stop_mark(),
             Key::Char('d') => self.choose_device(),
             Key::Char('A') => self.open_accounts(),
+            Key::Char('D') => {
+                self.menu = device_menu();
+                self.menu_index = 0;
+                self.mode = Mode::DeviceMenu;
+            }
             Key::Char('e') => {
                 self.form = Some(Form::archive_password());
                 self.mode = Mode::ArchivePassword;
@@ -995,7 +1037,14 @@ impl App {
             }
             Key::Enter | Key::Right | Key::Char(' ') => {
                 let Some(entry) = self.menu.get(self.menu_index).cloned() else { return };
-                if entry.action == Action::Remove && !self.tab.is_grabber() {
+                if entry.action.is_device() {
+                    if entry.confirm {
+                        self.message = Some((format!("{} on {}?  [y/N]", entry.label, self.device_name), false));
+                        self.mode = Mode::Confirm(entry.action);
+                    } else {
+                        self.run_action(entry.action);
+                    }
+                } else if entry.action == Action::Remove && !self.tab.is_grabber() {
                     // Files may exist on disk: ask what to do with them,
                     // the way the desktop dialog does.
                     self.remove_index = 0;

@@ -533,6 +533,34 @@ impl JdApi {
         self.call_unit("/accountsV2/refreshAccounts", &[json!(ids)])
     }
 
+    // --- the JDownloader itself -----------------------------------------
+
+    pub fn update_available(&mut self) -> Result<bool> {
+        self.call("/update/isUpdateAvailable", &[])
+    }
+
+    pub fn run_update_check(&mut self) -> Result<()> {
+        self.call_unit("/update/runUpdateCheck", &[])
+    }
+
+    /// Restart into the updater, which applies what was downloaded.
+    pub fn update_and_restart(&mut self) -> Result<()> {
+        self.call_unit("/update/restartAndUpdate", &[])
+    }
+
+    pub fn restart_jd(&mut self) -> Result<()> {
+        self.call_unit("/system/restartJD", &[])
+    }
+
+    pub fn exit_jd(&mut self) -> Result<()> {
+        self.call_unit("/system/exitJD", &[])
+    }
+
+    /// Ask the router for a new IP, as configured in JDownloader.
+    pub fn reconnect(&mut self) -> Result<()> {
+        self.call_unit("/reconnect/doReconnect", &[])
+    }
+
     pub fn is_collecting(&mut self) -> Result<bool> {
         self.call("/linkgrabberv2/isCollecting", &[])
     }
@@ -688,6 +716,16 @@ mod live {
         });
         println!("state after resume: {after}");
         assert_eq!(after, before);
+    }
+
+    /// The update check is the only device-level call safe to run here.
+    #[test]
+    #[ignore]
+    fn update_check_answers() {
+        let mut api = api();
+        api.run_update_check().expect("run update check");
+        let available = api.update_available().expect("update available");
+        println!("update available: {available}");
     }
 
     /// Priority, rename and download folder on a throwaway grabber package,

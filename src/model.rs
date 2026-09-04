@@ -183,7 +183,23 @@ pub enum Action {
     CheckOnline,
     /// Queue the complete archives of the selection for extraction.
     ExtractNow,
+    // The JDownloader itself, from the device menu; no selection involved.
+    CheckUpdate,
+    UpdateAndRestart,
+    RestartJd,
+    ExitJd,
+    Reconnect,
     Properties,
+}
+
+impl Action {
+    /// Acts on the JDownloader, not on rows.
+    pub fn is_device(self) -> bool {
+        matches!(
+            self,
+            Action::CheckUpdate | Action::UpdateAndRestart | Action::RestartJd | Action::ExitJd | Action::Reconnect
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -254,6 +270,18 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row], stop_mark: Opt
         entries.push(entry("Properties", Action::Properties, false));
     }
     entries
+}
+
+/// What can be done to the JDownloader itself. Nothing that touches the
+/// host machine (shutdown, standby) is offered.
+pub fn device_menu() -> Vec<MenuEntry> {
+    vec![
+        entry("Check for updates", Action::CheckUpdate, false),
+        entry("Update and restart", Action::UpdateAndRestart, true),
+        entry("Restart JDownloader", Action::RestartJd, true),
+        entry("Reconnect (new IP)", Action::Reconnect, true),
+        entry("Exit JDownloader", Action::ExitJd, true),
+    ]
 }
 
 // --- forms ------------------------------------------------------------------
