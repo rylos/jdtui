@@ -320,6 +320,11 @@ fn main() {
     app.rows = build_rows(&app.snapshot.grabber, &app.expanded);
     shot("link-grabber", &app);
 
+    // The key reference.
+    let mut app = base();
+    app.mode = Mode::Help;
+    shot("help", &app);
+
     // Keep the unused import honest when the example grows.
     let _ = (Action::Properties, RemoveMode::ListOnly);
 }

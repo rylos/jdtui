@@ -39,7 +39,41 @@ pub enum Mode {
     /// Choosing what happens to the files of the packages being removed.
     RemoveChoice,
     Add,
+    /// The full key reference; the footer only shows the frequent ones.
+    Help,
 }
+
+/// Every key of the main screen, grouped for the help panel. The README's
+/// key table mirrors this list.
+pub const HELP: &[(&str, &[(&str, &str)])] = &[
+    (
+        "Navigation",
+        &[
+            ("Tab", "Switch between Downloads and Link Grabber"),
+            ("↑ ↓  k j", "Move the cursor"),
+            ("→ ←", "Expand / collapse a package"),
+        ],
+    ),
+    (
+        "Selection",
+        &[
+            ("Space", "Mark the row under the cursor"),
+            ("a", "Mark every row, or clear the marks"),
+            ("Esc", "Clear the selection"),
+        ],
+    ),
+    (
+        "Actions",
+        &[
+            ("Enter", "Context menu on the selection"),
+            ("p", "Properties of the selected row"),
+            ("n", "Add links to the Link Grabber"),
+            ("c", "Move the whole Link Grabber to downloads"),
+        ],
+    ),
+    ("JDownloader", &[("s", "Start / stop downloads"), ("d", "Switch to another JDownloader of the account")]),
+    ("Program", &[("?  h", "This help"), ("q  Ctrl-C", "Quit")]),
+];
 
 pub enum Key {
     Char(char),
@@ -455,6 +489,11 @@ impl App {
                     }
                 },
                 Mode::Add => self.handle_add_key(key),
+                Mode::Help => {
+                    if matches!(key, Key::Esc | Key::Enter | Key::Char('q' | '?' | 'h')) {
+                        self.mode = Mode::List;
+                    }
+                }
             },
         }
     }
@@ -565,6 +604,7 @@ impl App {
             }
             Key::Char('s') => self.toggle_downloads(),
             Key::Char('d') => self.choose_device(),
+            Key::Char('?' | 'h') => self.mode = Mode::Help,
             Key::Char('c') if self.tab.is_grabber() => {
                 let pkgs: Vec<i64> = self.snapshot.grabber.iter().map(|p| p.uuid).collect();
                 if pkgs.is_empty() {
