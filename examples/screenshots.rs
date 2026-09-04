@@ -141,6 +141,19 @@ fn shot(name: &str, app: &App) {
     let path = format!("docs/{name}.svg");
     fs::write(&path, svg).unwrap();
     println!("wrote {path}");
+
+    // The README shows PNGs: they render everywhere, including on hosts that
+    // sanitise SVG or lack the fonts. Skipped when the converter is missing.
+    let png = format!("docs/{name}.png");
+    match std::process::Command::new("rsvg-convert").args(["-z", "2", &path, "-o", &png]).status() {
+        Ok(status) if status.success() => {
+            let _ = std::process::Command::new("pngquant")
+                .args(["--force", "--skip-if-larger", "--quality", "70-95", "--output", &png, &png])
+                .status();
+            println!("wrote {png}");
+        }
+        _ => println!("rsvg-convert not available, skipped {png}"),
+    }
 }
 
 fn link(uuid: i64, package: i64, name: &str, loaded: i64, total: i64, done: bool) -> Link {
