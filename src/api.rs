@@ -58,6 +58,10 @@ pub struct Link {
     pub finished_date: Option<i64>,
     pub host: Option<String>,
     pub priority: Option<String>,
+    /// The link offers several variants (video qualities, audio only…).
+    pub variants: Option<bool>,
+    /// The variant currently chosen, when the link has any.
+    pub variant: Option<LinkVariant>,
     pub running: Option<bool>,
     pub speed: Option<i64>,
     pub status: Option<String>,
@@ -178,6 +182,14 @@ impl RemoveMode {
     pub fn touches_files(self) -> bool {
         self != RemoveMode::ListOnly
     }
+}
+
+/// One of the forms a link can be downloaded in, such as a video quality.
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkVariant {
+    pub id: Option<String>,
+    pub name: Option<String>,
 }
 
 /// One archive in the extraction queue.
@@ -327,7 +339,8 @@ impl JdApi {
             &[json!({
                 "availability": true, "bytesTotal": true, "comment": true,
                 "enabled": true, "host": true, "packageUUIDs": [], "priority": true,
-                "status": true, "url": true, "maxResults": -1, "startAt": 0,
+                "status": true, "url": true, "variants": true, "variantID": true,
+                "variantName": true, "maxResults": -1, "startAt": 0,
             })],
         )?;
         Ok(attach(packages, links))
@@ -566,6 +579,15 @@ impl JdApi {
         self.call_unit("/reconnect/doReconnect", &[])
     }
 
+    /// The variants a grabber link offers; empty when it has none.
+    pub fn variants(&mut self, link: i64) -> Result<Vec<LinkVariant>> {
+        self.call("/linkgrabberv2/getVariants", &[json!(link)])
+    }
+
+    pub fn set_variant(&mut self, link: i64, variant_id: &str) -> Result<()> {
+        self.call_unit("/linkgrabberv2/setVariant", &[json!(link), json!(variant_id)])
+    }
+
     pub fn is_collecting(&mut self) -> Result<bool> {
         self.call("/linkgrabberv2/isCollecting", &[])
     }
@@ -645,8 +667,17 @@ mod live {
         JdApi::new(myjd, device.id)
     }
 
-    fn wait_for<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
-        for _ in 0..30 {
+    fn wait_for<T>(what: &str, f: impl FnMut() -> Option<T>) -> T {
+        wait_up_to(what, 30, f)
+    }
+
+    /// Two minutes, for crawls that go out to the hoster.
+    fn wait_for_long<T>(what: &str, f: impl FnMut() -> Option<T>) -> T {
+        wait_up_to(what, 240, f)
+    }
+
+    fn wait_up_to<T>(what: &str, tries: usize, mut f: impl FnMut() -> Option<T>) -> T {
+        for _ in 0..tries {
             if let Some(v) = f() {
                 return v;
             }
@@ -781,6 +812,50 @@ mod live {
             (p.save_to.as_deref().map(|s| s.trim_end_matches(['/', '\\'])) == Some(dir.as_str())).then_some(())
         });
         println!("download folder set to {dir}");
+
+        api.remove(&[], &[pkg.uuid], true).expect("remove");
+        wait_for("the package to disappear", || api.grabber().ok()?.iter().all(|p| p.uuid != pkg.uuid).then_some(()));
+    }
+
+    /// A YouTube link crawls into several variants; pick another one and
+    /// read it back. Needs the YouTube plugin, which every JDownloader has.
+    #[test]
+    #[ignore]
+    fn variants_can_be_listed_and_chosen() {
+        let mut api = api();
+        api.add_links(&AddLinks {
+            links: "https://www.youtube.com/watch?v=jNQXAC9IVRw".into(),
+            package_name: "jdtui-variant-test".into(),
+            ..Default::default()
+        })
+        .expect("add links");
+        // The YouTube plugin names the package itself, so look for the
+        // host; crawling a video takes a while.
+        let (pkg, link) = wait_for_long("a YouTube link with variants to appear", || {
+            let pkg = api.grabber().ok()?.into_iter().find(|p| {
+                p.links.iter().any(|l| l.host.as_deref() == Some("youtube.com") && l.variants == Some(true))
+            })?;
+            let link = pkg.links.iter().find(|l| l.variants == Some(true))?.clone();
+            Some((pkg, link))
+        });
+        println!("link {} ({}), current variant {:?}", link.name, link.uuid, link.variant);
+
+        let variants = api.variants(link.uuid).expect("variants");
+        println!("{} variants:", variants.len());
+        for v in &variants {
+            println!("  {:?} {:?}", v.id, v.name);
+        }
+        assert!(variants.len() > 1);
+
+        let other = variants.iter().find(|v| v.id != link.variant.as_ref().and_then(|c| c.id.clone())).unwrap();
+        let wanted = other.id.clone().unwrap();
+        api.set_variant(link.uuid, &wanted).expect("set variant");
+        wait_for("the variant to read back", || {
+            let p = api.grabber().ok()?.into_iter().find(|p| p.uuid == pkg.uuid)?;
+            let l = p.links.iter().find(|l| l.uuid == link.uuid)?;
+            (l.variant.as_ref().and_then(|v| v.id.clone()) == Some(wanted.clone())).then_some(())
+        });
+        println!("variant switched to {:?}", other.name);
 
         api.remove(&[], &[pkg.uuid], true).expect("remove");
         wait_for("the package to disappear", || api.grabber().ok()?.iter().all(|p| p.uuid != pkg.uuid).then_some(()));

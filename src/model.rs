@@ -196,6 +196,8 @@ pub enum Action {
     CheckOnline,
     /// Queue the complete archives of the selection for extraction.
     ExtractNow,
+    /// Open the variant chooser; one grabber link with variants.
+    Variant,
     // The JDownloader itself, from the device menu; no selection involved.
     CheckUpdate,
     /// Give up on every captcha waiting; the blocked links are skipped.
@@ -278,6 +280,13 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row], stop_mark: Opt
     insert(entry("Split by hoster", Action::SplitByHoster, false));
     insert(entry("Copy urls", Action::Urls, false));
     insert(entry("Check availability", Action::CheckOnline, false));
+    if single
+        && tab.is_grabber()
+        && let Some(l) = rows[0].link
+        && packages[rows[0].package].links[l].variants == Some(true)
+    {
+        insert(entry("Choose variant…", Action::Variant, false));
+    }
     if single && !tab.is_grabber() {
         let marked = row_stop_marked(packages, &rows[0], stop_mark);
         insert(entry(if marked { "Remove stop mark" } else { "Stop after this" }, Action::ToggleStopMark, false));
