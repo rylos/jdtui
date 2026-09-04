@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, BorderType, Cell, Clear, Paragraph, Row as TRow, T
 
 use crate::api::{Link, Package};
 use crate::app::{App, HELP, Mode, Screen};
-use crate::model::{FieldKind, Form, PRIORITIES, Row, Tab, describe, row_key};
+use crate::model::{FieldKind, Form, PRIORITIES, Row, Tab, describe, row_key, row_stop_marked};
 
 // --- palette ----------------------------------------------------------------
 //
@@ -365,6 +365,24 @@ fn draw_list(frame: &mut Frame, app: &App, area: Rect) {
     if !app.marked.is_empty() {
         title_line.push_span(Span::styled(format!("({} selected) ", app.marked.len()), Style::new().fg(accent())));
     }
+    if app.tab == Tab::Downloads
+        && let Some(uuid) = app.snapshot.stop_mark
+    {
+        let name = packages
+            .iter()
+            .find_map(|p| {
+                if p.uuid == uuid {
+                    Some(p.name.as_str())
+                } else {
+                    p.links.iter().find(|l| l.uuid == uuid).map(|l| l.name.as_str())
+                }
+            })
+            .unwrap_or("a hidden entry");
+        title_line.push_span(Span::styled(
+            format!("(stops after '{}') ", crate::app::truncate(name, 30)),
+            Style::new().fg(Color::Red),
+        ));
+    }
     let border_color = if app.refresh_error.is_some() { Color::Yellow } else { Color::DarkGray };
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
@@ -404,6 +422,15 @@ fn mark(app: &App, packages: &[Package], row: &Row) -> &'static str {
     if app.marked.contains(&row_key(packages, row)) { "✓" } else { " " }
 }
 
+/// The "downloads stop after this" badge, empty on every other row.
+fn stop_mark(app: &App, packages: &[Package], row: &Row) -> Span<'static> {
+    if row_stop_marked(packages, row, app.snapshot.stop_mark) {
+        Span::styled("  ■ stop", Style::new().fg(Color::Red).bold())
+    } else {
+        Span::raw("")
+    }
+}
+
 fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static str>, Vec<Constraint>, Vec<TRow<'a>>) {
     let header = vec!["Name", "Links", "Size", "Status", "Progress", "%", "Speed", "ETA"];
     let widths = vec![
@@ -427,7 +454,10 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
                     let marker = if app.expanded.contains(&pkg.uuid) { "▼" } else { "▶" };
                     let pct = pkg.progress();
                     TRow::new(vec![
-                        Cell::from(format!("{}{marker} {}", mark(app, packages, row), pkg.name)),
+                        Cell::from(Line::from(vec![
+                            Span::raw(format!("{}{marker} {}", mark(app, packages, row), pkg.name)),
+                            stop_mark(app, packages, row),
+                        ])),
                         Cell::from(Span::styled(format!("[{}]", pkg.child_count.unwrap_or(0)), Style::new().dim())),
                         Cell::from(Span::styled(
                             format!(
@@ -455,10 +485,10 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
                     let link: &Link = &pkg.links[l];
                     let pct = link.progress();
                     TRow::new(vec![
-                        Cell::from(Span::styled(
-                            format!(" {}  └ {}", mark(app, packages, row), link.name),
-                            Style::new().dim(),
-                        )),
+                        Cell::from(Line::from(vec![
+                            Span::styled(format!(" {}  └ {}", mark(app, packages, row), link.name), Style::new().dim()),
+                            stop_mark(app, packages, row),
+                        ])),
                         Cell::from(""),
                         Cell::from(Span::styled(
                             format!(
@@ -821,7 +851,7 @@ mod tests {
             links: vec![link],
             ..Default::default()
         };
-        Snapshot { state: "IDLE".into(), speed: 0, downloads: vec![package], grabber: Vec::new() }
+        Snapshot { state: "IDLE".into(), downloads: vec![package], ..Default::default() }
     }
 
     /// The whole frame as text, one string per row.

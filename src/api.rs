@@ -110,6 +110,8 @@ pub struct Snapshot {
     /// Bytes per second, as the controller reports it: includes traffic
     /// the per-link figures miss (rar extraction aside).
     pub speed: i64,
+    /// Uuid of the link or package downloads stop after, if set.
+    pub stop_mark: Option<i64>,
     pub downloads: Vec<Package>,
     pub grabber: Vec<Package>,
 }
@@ -278,6 +280,7 @@ impl JdApi {
         Ok(Snapshot {
             state: self.state()?,
             speed: self.speed()?,
+            stop_mark: self.stop_mark()?,
             downloads: self.downloads()?,
             grabber: self.grabber()?,
         })
@@ -370,9 +373,10 @@ impl JdApi {
         Ok((id > 0).then_some(id))
     }
 
-    /// Exactly one of `link` and `package`, as the API takes it.
-    pub fn set_stop_mark(&mut self, link: Option<i64>, package: Option<i64>) -> Result<()> {
-        self.call_unit("/downloadsV2/setStopMark", &[json!(link.unwrap_or(-1)), json!(package.unwrap_or(-1))])
+    /// The API marks links only: given a package id it marks the first
+    /// link of it, so callers pick the link themselves.
+    pub fn set_stop_mark(&mut self, link: i64) -> Result<()> {
+        self.call_unit("/downloadsV2/setStopMark", &[json!(link), json!(-1)])
     }
 
     pub fn remove_stop_mark(&mut self) -> Result<()> {
@@ -491,6 +495,16 @@ mod live {
             api.downloads().ok()?.into_iter().find(|p| p.name == NAME).map(|p| p.uuid)
         });
         println!("moved to the download list: {uuid}");
+
+        // The stop mark, while there is a link of ours to put it on.
+        let link = wait_for("the link to be listed", || {
+            api.downloads().ok()?.into_iter().find(|p| p.uuid == uuid)?.links.first().map(|l| l.uuid)
+        });
+        api.set_stop_mark(link).expect("set stop mark");
+        wait_for("the stop mark to read back", || (api.stop_mark().ok()? == Some(link)).then_some(()));
+        api.remove_stop_mark().expect("remove stop mark");
+        wait_for("the stop mark to clear", || api.stop_mark().ok()?.is_none().then_some(()));
+        println!("stop mark set and cleared");
 
         api.remove_with_files(&[], &[uuid], RemoveMode::DeleteFiles).expect("remove with delete files");
         wait_for("the package to disappear", || api.downloads().ok()?.iter().all(|p| p.name != NAME).then_some(()));

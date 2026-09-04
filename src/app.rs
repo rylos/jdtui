@@ -8,7 +8,7 @@ use crate::api::{AddLinks, JdApi, RemoveMode, Snapshot, describe_error};
 use crate::config::Config;
 use crate::model::{
     Action, Form, MenuEntry, PRIORITIES, Row, RowKey, Tab, build_rows, collect_ids, context_menu, describe,
-    packages_of, row_key, row_name, row_priority,
+    packages_of, row_key, row_name, row_priority, row_stop_marked, stop_mark_target,
 };
 use crate::myjd::{Device, MyJd};
 use crate::poller::{Poller, Update};
@@ -74,6 +74,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
             ("Enter", "Context menu on the selection"),
             ("p", "Properties of the selected row"),
             ("n", "Add links to the Link Grabber"),
+            ("t", "Stop after this row (again to clear)"),
             ("c", "Move the whole Link Grabber to downloads"),
         ],
     ),
@@ -374,6 +375,10 @@ impl App {
                 self.mode = Mode::Properties;
                 return;
             }
+            Action::ToggleStopMark => {
+                self.toggle_stop_mark();
+                return;
+            }
             Action::Rename => {
                 self.form = Some(Form::rename(row_name(self.packages(), &targets[0])));
                 self.mode = Mode::Rename;
@@ -426,9 +431,12 @@ impl App {
             Action::PriorityTo(priority) => self
                 .with_api(|a| a.set_priority(priority, &links, &pkgs, grabber))
                 .map(|_| format!("{what} set to priority {}", priority.to_lowercase())),
-            Action::ToggleExpand | Action::Properties | Action::Priority | Action::Rename | Action::Directory => {
-                unreachable!()
-            }
+            Action::ToggleExpand
+            | Action::Properties
+            | Action::Priority
+            | Action::Rename
+            | Action::Directory
+            | Action::ToggleStopMark => unreachable!(),
         };
         self.finish(outcome);
     }
@@ -488,6 +496,30 @@ impl App {
             self.form = None;
         }
         self.finish(outcome);
+    }
+
+    /// Downloads stop after the row under the cursor; again on the same
+    /// row clears the mark.
+    fn toggle_stop_mark(&mut self) {
+        if self.tab.is_grabber() {
+            return;
+        }
+        let Some(row) = self.current_row() else { return };
+        let name = truncate(row_name(self.packages(), &row), 40);
+        let outcome = if row_stop_marked(self.packages(), &row, self.snapshot.stop_mark) {
+            self.with_api(|a| a.remove_stop_mark()).map(|_| "Stop mark removed".to_string())
+        } else {
+            match stop_mark_target(self.packages(), &row) {
+                Some(link) => {
+                    self.with_api(|a| a.set_stop_mark(link)).map(|_| format!("Downloads will stop after '{name}'"))
+                }
+                None => Err("the package has no links".to_string()),
+            }
+        };
+        // The mark is not a selection action: keep the marks.
+        let marked = std::mem::take(&mut self.marked);
+        self.finish(outcome);
+        self.marked = marked;
     }
 
     fn submit_rename(&mut self) {
@@ -697,7 +729,7 @@ impl App {
             Key::Enter => {
                 let targets = self.target_rows();
                 if !targets.is_empty() {
-                    self.menu = context_menu(self.tab, self.packages(), &targets);
+                    self.menu = context_menu(self.tab, self.packages(), &targets, self.snapshot.stop_mark);
                     self.menu_index = 0;
                     self.mode = Mode::Menu;
                 }
@@ -713,6 +745,7 @@ impl App {
             }
             Key::Char('s') => self.toggle_downloads(),
             Key::Char('P') => self.toggle_pause(),
+            Key::Char('t') if !self.tab.is_grabber() => self.toggle_stop_mark(),
             Key::Char('d') => self.choose_device(),
             Key::Char('?' | 'h') => self.mode = Mode::Help,
             Key::Char('c') if self.tab.is_grabber() => {
