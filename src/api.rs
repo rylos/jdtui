@@ -355,13 +355,21 @@ mod live {
     use super::*;
     use crate::myjd::MyJd;
 
-    fn api_for(device_name: &str) -> JdApi {
+    /// The device named by `JDTUI_TEST_DEVICE`, or the one in the config, or
+    /// the first on the account.
+    fn api() -> JdApi {
         let cfg = crate::config::Config::load().expect("config");
         let (email, password) = (cfg.email.expect("email"), cfg.password.expect("password"));
         let mut myjd = MyJd::new(&email, &password);
         myjd.connect().expect("connect");
         let devices = myjd.list_devices().expect("devices");
-        let device = devices.iter().find(|d| d.name == device_name).expect("device not found").clone();
+        assert!(!devices.is_empty(), "no JDownloader on this account");
+        let wanted = std::env::var("JDTUI_TEST_DEVICE").ok();
+        let device = wanted
+            .and_then(|name| devices.iter().find(|d| d.name == name).cloned())
+            .or_else(|| cfg.device.and_then(|id| devices.iter().find(|d| d.id == id).cloned()))
+            .unwrap_or_else(|| devices[0].clone());
+        println!("using device: {}", device.name);
         JdApi::new(myjd, device.id)
     }
 
@@ -379,7 +387,7 @@ mod live {
     #[ignore]
     fn remove_with_delete_files_is_accepted() {
         const NAME: &str = "jdtui-remove-test";
-        let mut api = api_for("jd2@docker");
+        let mut api = api();
 
         api.add_links(&AddLinks {
             links: "http://example.com/jdtui-remove-test.bin".into(),

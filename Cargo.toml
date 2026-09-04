@@ -1,7 +1,12 @@
 [package]
 name = "jdtui"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
+description = "A terminal UI for JDownloader 2, over the My.JDownloader API"
+license = "MIT"
+repository = "https://github.com/rylos/jdtui"
+keywords = ["jdownloader", "tui", "downloads", "terminal"]
+categories = ["command-line-utilities"]
 
 [lib]
 name = "jdtui"
