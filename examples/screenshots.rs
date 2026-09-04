@@ -254,6 +254,11 @@ fn demo() -> Snapshot {
                     link(400 + i, 4, &format!("libreoffice-25.2.part{}.rar", i + 1), 0, 350 * 1024 * 1024, false);
                 l.availability = Some("ONLINE".into());
                 l.status = None;
+                if i == 0 {
+                    l.variants = Some(true);
+                    l.variant =
+                        Some(jdtui::api::LinkVariant { id: Some("1080p".into()), name: Some("1080p MP4".into()) });
+                }
                 l
             })
             .collect(),

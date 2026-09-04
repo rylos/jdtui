@@ -8,6 +8,8 @@
   on.
 - `/` filters the list by name, hoster or status as you type; `Esc` clears
   it.
+- Link Grabber links that come in several variants (video qualities, audio
+  only) show the chosen one, and the context menu switches it.
 
 ## 1.1.1 — 2026-09-04
 

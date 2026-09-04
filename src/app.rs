@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::api::{Account, AddLinks, JdApi, RemoveMode, Snapshot, describe_error};
+use crate::api::{Account, AddLinks, JdApi, LinkVariant, RemoveMode, Snapshot, describe_error};
 use crate::config::Config;
 use crate::model::{
     Action, Form, MenuEntry, PRIORITIES, Row, RowKey, Tab, build_rows, collect_ids, context_menu, describe,
@@ -40,6 +40,8 @@ pub enum Mode {
     RemoveChoice,
     /// Choosing a priority for the selection.
     PriorityChoice,
+    /// Choosing a variant for the grabber link under the cursor.
+    VariantChoice,
     Add,
     /// Editing the name of the row under the cursor, in `form`.
     Rename,
@@ -159,6 +161,9 @@ pub struct App {
     pub remove_index: usize,
     /// Highlighted entry of the priority panel, an index into `PRIORITIES`.
     pub priority_index: usize,
+    /// Variants of the link under the cursor, for `Mode::VariantChoice`.
+    pub variants: Vec<LinkVariant>,
+    pub variant_index: usize,
     pub form: Option<Form>,
 
     /// Urls shown by `Mode::Urls`.
@@ -198,6 +203,8 @@ impl App {
             menu_index: 0,
             remove_index: 0,
             priority_index: 0,
+            variants: Vec::new(),
+            variant_index: 0,
             form: None,
             urls: Vec::new(),
             accounts: Vec::new(),
@@ -238,6 +245,8 @@ impl App {
             menu_index: 0,
             remove_index: 0,
             priority_index: 0,
+            variants: Vec::new(),
+            variant_index: 0,
             form: None,
             urls: Vec::new(),
             accounts: Vec::new(),
@@ -452,6 +461,10 @@ impl App {
                 self.copy_urls();
                 return;
             }
+            Action::Variant => {
+                self.open_variants();
+                return;
+            }
             Action::NewPackage => {
                 self.form = Some(Form::new_package());
                 self.mode = Mode::NewPackage;
@@ -517,6 +530,7 @@ impl App {
             | Action::ClearGrabber
             | Action::NewPackage
             | Action::Urls
+            | Action::Variant
             | Action::CheckUpdate
             | Action::SkipCaptchas
             | Action::UpdateAndRestart
@@ -743,6 +757,41 @@ impl App {
         }
     }
 
+    /// Fetch the variants of the link under the cursor and open the chooser
+    /// on the current one.
+    fn open_variants(&mut self) {
+        let Some(row) = self.current_row() else { return };
+        let Some(l) = row.link else { return };
+        let link = &self.packages()[row.package].links[l];
+        let (uuid, current) = (link.uuid, link.variant.as_ref().and_then(|v| v.id.clone()));
+        match self.with_api(|a| a.variants(uuid)) {
+            Ok(variants) if variants.is_empty() => {
+                self.message = Some(("This link has no variants".into(), true));
+                self.mode = Mode::List;
+            }
+            Ok(variants) => {
+                self.variant_index = variants.iter().position(|v| v.id == current).unwrap_or(0);
+                self.variants = variants;
+                self.mode = Mode::VariantChoice;
+            }
+            Err(e) => {
+                self.message = Some((format!("Failed: {e}"), true));
+                self.mode = Mode::List;
+            }
+        }
+    }
+
+    fn choose_variant(&mut self) {
+        let Some(row) = self.current_row() else { return };
+        let Some(l) = row.link else { return };
+        let uuid = self.packages()[row.package].links[l].uuid;
+        let Some(variant) = self.variants.get(self.variant_index).cloned() else { return };
+        let id = variant.id.clone().unwrap_or_default();
+        let name = variant.name.clone().unwrap_or_else(|| id.clone());
+        let outcome = self.with_api(|a| a.set_variant(uuid, &id)).map(|_| format!("Variant set to {name}"));
+        self.finish(outcome);
+    }
+
     /// Fetch the urls of the selection, show them and copy them.
     fn copy_urls(&mut self) {
         let targets = self.target_rows();
@@ -879,6 +928,18 @@ impl App {
                     Key::Enter | Key::Right | Key::Char(' ') => {
                         self.run_action(Action::PriorityTo(PRIORITIES[self.priority_index]))
                     }
+                    _ => {}
+                },
+                Mode::VariantChoice => match key {
+                    Key::Esc | Key::Left | Key::Char('q') => {
+                        self.mode = Mode::List;
+                        self.message = Some(("Cancelled".into(), false));
+                    }
+                    Key::Up | Key::Char('k') => self.variant_index = self.variant_index.saturating_sub(1),
+                    Key::Down | Key::Char('j') => {
+                        self.variant_index = (self.variant_index + 1).min(self.variants.len().saturating_sub(1))
+                    }
+                    Key::Enter | Key::Right | Key::Char(' ') => self.choose_variant(),
                     _ => {}
                 },
                 Mode::Confirm(action) => match key {

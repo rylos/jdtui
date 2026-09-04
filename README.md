@@ -65,6 +65,8 @@ What the menu offers, depending on the tab and the selection:
 - **Check availability**, **Extract now**, **Delete finished links**
 - **Stop after this**: the download list stops once this row is done; `t` does
   the same without opening the menu, and again on the same row clears it
+- **Choose variant…** on a Link Grabber link that offers several, such as
+  the qualities of a video
 - **Remove**, **Move to download list** on the Link Grabber tab
 
 Removing from the **Downloads** tab asks what should happen to the files already

@@ -330,6 +330,7 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         Mode::Menu | Mode::DeviceMenu => 34,
         Mode::RemoveChoice | Mode::Confirm(crate::model::Action::RemoveWith(_)) => 46,
         Mode::PriorityChoice => 34,
+        Mode::VariantChoice => 44,
         Mode::Properties => 62,
         _ => 0,
     };
@@ -387,6 +388,7 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
                 draw_remove_choice(frame, app, side)
             }
             Mode::PriorityChoice => draw_priority_choice(frame, app, side),
+            Mode::VariantChoice => draw_variant_choice(frame, app, side),
             Mode::Properties => draw_properties(frame, app, side),
             _ => {}
         }
@@ -613,11 +615,15 @@ fn grabber_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static str>
                     let link = &pkg.links[l];
                     let availability = link.availability.clone().unwrap_or_else(|| "-".into());
                     let online = availability == "ONLINE";
+                    let mut name = vec![Span::styled(
+                        format!(" {}  └ {}", mark(app, packages, row), link.name),
+                        Style::new().dim(),
+                    )];
+                    if let Some(v) = link.variant.as_ref().and_then(|v| v.name.clone()) {
+                        name.push(Span::styled(format!("  [{v}]"), Style::new().fg(Color::Magenta)));
+                    }
                     TRow::new(vec![
-                        Cell::from(Span::styled(
-                            format!(" {}  └ {}", mark(app, packages, row), link.name),
-                            Style::new().dim(),
-                        )),
+                        Cell::from(Line::from(name)),
                         Cell::from(""),
                         Cell::from(Span::styled(human_size(link.bytes_total.unwrap_or(0)), Style::new().dim())),
                         Cell::from(Span::styled(
@@ -675,6 +681,24 @@ fn draw_priority_choice(frame: &mut Frame, app: &App, area: Rect) {
             let style = if selected { selected_style() } else { Style::new() };
             let label = format!("{}{}", &p[..1], p[1..].to_lowercase());
             Line::from(Span::styled(format!(" {} {label}", if selected { "›" } else { " " }), style))
+        })
+        .collect();
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
+fn draw_variant_choice(frame: &mut Frame, app: &App, area: Rect) {
+    let block = panel("Variant", Some("Enter choose · Esc cancel"));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    let lines: Vec<Line> = app
+        .variants
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let selected = i == app.variant_index;
+            let style = if selected { selected_style() } else { Style::new() };
+            let name = v.name.clone().or_else(|| v.id.clone()).unwrap_or_default();
+            Line::from(Span::styled(format!(" {} {name}", if selected { "›" } else { " " }), style))
         })
         .collect();
     frame.render_widget(Paragraph::new(lines), inner);
@@ -746,6 +770,7 @@ fn draw_properties(frame: &mut Frame, app: &App, area: Rect) {
             push("Size", link.bytes_total.map(human_size));
             push("Loaded", link.bytes_loaded.map(human_size));
             push("Availability", link.availability.clone());
+            push("Variant", link.variant.as_ref().and_then(|v| v.name.clone()));
             push("Host", link.host.clone());
             push("Enabled", Some(if link.is_enabled() { "yes" } else { "no" }.into()));
             push("Priority", link.priority.clone());
