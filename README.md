@@ -46,6 +46,7 @@ another one, or start with `jdtui --choose-device`.
 | `n` | Add links to the Link Grabber |
 | `t` | Stop downloads after the row under the cursor; again to clear |
 | `y` | Show the urls of the selection and copy them to the clipboard |
+| `e` | Add a password to the list tried on every archive |
 | `s` | Start / stop downloads |
 | `P` | Pause / resume downloads |
 | `d` | Switch to another JDownloader of the account |

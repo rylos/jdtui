@@ -1,8 +1,10 @@
 //! Refreshes the snapshot on a background thread.
 //!
-//! A full refresh is four round trips through the My.JDownloader relay, well
-//! into the hundreds of milliseconds; keeping it off the input thread is what
-//! keeps the interface responsive.
+//! A refresh is four round trips through the My.JDownloader relay, well into
+//! the hundreds of milliseconds; keeping it off the input thread is what
+//! keeps the interface responsive. The slow-changing status (stop mark,
+//! crawling, extraction, captchas) is four more, fetched every
+//! `STATUS_EVERY` refreshes and right after an action.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -10,7 +12,9 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 use std::time::Duration;
 
-use crate::api::{SharedApi, Snapshot, describe_error};
+use crate::api::{SharedApi, Snapshot, Status, describe_error};
+
+const STATUS_EVERY: u32 = 5;
 
 pub enum Update {
     Snapshot(Snapshot),
@@ -31,8 +35,16 @@ impl Poller {
         let stop_flag = stop.clone();
 
         thread::spawn(move || {
+            let mut status = Status::default();
+            let mut tick: u32 = 0;
+            let mut woken = true;
             while !stop_flag.load(Ordering::Relaxed) {
-                let result = api.lock().map(|mut a| a.snapshot());
+                let result = api.lock().map(|mut a| {
+                    if woken || tick.is_multiple_of(STATUS_EVERY) {
+                        status = a.status()?;
+                    }
+                    a.snapshot(status.clone())
+                });
                 let update = match result {
                     Ok(Ok(s)) => Update::Snapshot(s),
                     Ok(Err(e)) => Update::Error(describe_error(&e)),
@@ -41,9 +53,10 @@ impl Poller {
                 if tx.send(update).is_err() {
                     break;
                 }
+                tick = tick.wrapping_add(1);
                 // Sleep until the period elapses or someone asks for an
                 // early refresh, which an action does after it succeeds.
-                let _ = wake_rx.recv_timeout(period);
+                woken = wake_rx.recv_timeout(period).is_ok();
                 while wake_rx.try_recv().is_ok() {}
             }
         });

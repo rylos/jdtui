@@ -9,7 +9,7 @@
 use std::fmt::Write as _;
 use std::fs;
 
-use jdtui::api::{Link, Package, RemoveMode, Snapshot};
+use jdtui::api::{ArchiveStatus, Link, Package, RemoveMode, Snapshot};
 use jdtui::app::{App, Mode};
 use jdtui::model::{Action, Form, Tab, build_rows, context_menu};
 use jdtui::ui;
@@ -265,6 +265,12 @@ fn demo() -> Snapshot {
         speed: 11 * 1024 * 1024,
         stop_mark: Some(207),
         collecting: true,
+        extracting: vec![ArchiveStatus {
+            archive_name: Some("blender-demo".into()),
+            controller_status: Some("RUNNING".into()),
+            ..Default::default()
+        }],
+        captchas: Vec::new(),
         downloads: vec![finished, running, queued],
         grabber: vec![grabbed],
     }
