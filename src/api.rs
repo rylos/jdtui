@@ -166,6 +166,47 @@ impl RemoveMode {
     }
 }
 
+/// One archive in the extraction queue.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveStatus {
+    pub archive_id: Option<String>,
+    pub archive_name: Option<String>,
+    pub controller_id: Option<i64>,
+    /// `RUNNING` or `QUEUED`.
+    pub controller_status: Option<String>,
+}
+
+/// A captcha JDownloader is waiting on.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptchaJob {
+    pub id: i64,
+    pub hoster: Option<String>,
+    pub link: Option<i64>,
+    pub created: Option<i64>,
+    pub timeout: Option<i64>,
+    #[serde(rename = "type")]
+    pub kind: Option<String>,
+    pub explain: Option<String>,
+}
+
+/// A premium (or free) account JDownloader knows about.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Account {
+    pub uuid: i64,
+    pub hostname: Option<String>,
+    pub username: Option<String>,
+    pub enabled: Option<bool>,
+    pub valid: Option<bool>,
+    pub valid_until: Option<i64>,
+    pub traffic_left: Option<i64>,
+    pub traffic_max: Option<i64>,
+    pub error_type: Option<String>,
+    pub error_string: Option<String>,
+}
+
 /// The GUI's "add links" dialog, field by field.
 #[derive(Debug, Clone, Default)]
 pub struct AddLinks {
@@ -386,6 +427,83 @@ impl JdApi {
         self.call_unit("/downloadsV2/removeStopMark", &[])
     }
 
+    /// Move the selection into a new package. Empty `directory` keeps the
+    /// current folder.
+    pub fn move_to_new_package(
+        &mut self,
+        links: &[i64],
+        packages: &[i64],
+        name: &str,
+        directory: &str,
+        grabber: bool,
+    ) -> Result<()> {
+        let path = if grabber { "/linkgrabberv2/movetoNewPackage" } else { "/downloadsV2/movetoNewPackage" };
+        self.call_unit(path, &[json!(links), json!(packages), json!(name), opt(directory)])
+    }
+
+    pub fn split_by_hoster(&mut self, links: &[i64], packages: &[i64], grabber: bool) -> Result<()> {
+        let path = if grabber { "/linkgrabberv2/splitPackageByHoster" } else { "/downloadsV2/splitPackageByHoster" };
+        self.call_unit(path, &[json!(links), json!(packages)])
+    }
+
+    /// The content urls of the selection, one per distinct url.
+    pub fn download_urls(&mut self, links: &[i64], packages: &[i64], grabber: bool) -> Result<Vec<String>> {
+        let path = if grabber { "/linkgrabberv2/getDownloadUrls" } else { "/downloadsV2/getDownloadUrls" };
+        let map: std::collections::BTreeMap<String, Vec<i64>> =
+            self.call(path, &[json!(links), json!(packages), json!(["CONTENT"])])?;
+        Ok(map.into_keys().collect())
+    }
+
+    /// Clear the skip reason of the selection, whatever it was.
+    pub fn unskip(&mut self, links: &[i64], packages: &[i64]) -> Result<()> {
+        // Package ids first: this one takes them the other way round.
+        self.call_unit("/downloadsV2/unskip", &[json!(packages), json!(links), Value::Null])
+    }
+
+    pub fn check_online_status(&mut self, links: &[i64], packages: &[i64], grabber: bool) -> Result<()> {
+        let path =
+            if grabber { "/linkgrabberv2/startOnlineStatusCheck" } else { "/downloadsV2/startOnlineStatusCheck" };
+        self.call_unit(path, &[json!(links), json!(packages)])
+    }
+
+    // --- extraction, captchas, accounts ---------------------------------
+
+    pub fn extraction_queue(&mut self) -> Result<Vec<ArchiveStatus>> {
+        self.call("/extraction/getQueue", &[])
+    }
+
+    /// Queue the complete archives of the selection for extraction now.
+    pub fn extract_now(&mut self, links: &[i64], packages: &[i64]) -> Result<()> {
+        self.call_unit("/extraction/startExtractionNow", &[json!(links), json!(packages)])
+    }
+
+    pub fn add_archive_password(&mut self, password: &str) -> Result<()> {
+        self.call_unit("/extraction/addArchivePassword", &[json!(password)])
+    }
+
+    pub fn captchas(&mut self) -> Result<Vec<CaptchaJob>> {
+        self.call("/captcha/list", &[])
+    }
+
+    pub fn accounts(&mut self) -> Result<Vec<Account>> {
+        self.call(
+            "/accountsV2/listAccounts",
+            &[json!({
+                "enabled": true, "error": true, "trafficLeft": true, "trafficMax": true,
+                "userName": true, "valid": true, "validUntil": true, "maxResults": -1, "startAt": 0,
+            })],
+        )
+    }
+
+    pub fn set_accounts_enabled(&mut self, enable: bool, ids: &[i64]) -> Result<()> {
+        let path = if enable { "/accountsV2/enableAccounts" } else { "/accountsV2/disableAccounts" };
+        self.call_unit(path, &[json!(ids)])
+    }
+
+    pub fn refresh_accounts(&mut self, ids: &[i64]) -> Result<()> {
+        self.call_unit("/accountsV2/refreshAccounts", &[json!(ids)])
+    }
+
     pub fn is_collecting(&mut self) -> Result<bool> {
         self.call("/linkgrabberv2/isCollecting", &[])
     }
@@ -594,5 +712,57 @@ mod live {
 
         api.remove(&[], &[pkg.uuid], true).expect("remove");
         wait_for("the package to disappear", || api.grabber().ok()?.iter().all(|p| p.uuid != pkg.uuid).then_some(()));
+    }
+
+    /// The read-only endpoints answer, and the grabber ones that reshape
+    /// packages accept a throwaway package.
+    #[test]
+    #[ignore]
+    fn queries_and_package_reshaping_are_accepted() {
+        const NAME: &str = "jdtui-reshape-test";
+        let mut api = api();
+
+        println!("extraction queue: {:?}", api.extraction_queue().expect("extraction queue"));
+        println!("captchas: {:?}", api.captchas().expect("captchas"));
+        let accounts = api.accounts().expect("accounts");
+        println!("accounts: {}", accounts.len());
+        for a in &accounts {
+            println!("  {:?} {:?} enabled={:?} valid={:?}", a.hostname, a.username, a.enabled, a.valid);
+        }
+
+        api.add_links(&AddLinks {
+            links: "http://example.com/jdtui-reshape-a.bin http://example.org/jdtui-reshape-b.bin".into(),
+            package_name: NAME.into(),
+            ..Default::default()
+        })
+        .expect("add links");
+        let pkg = wait_for("the package to appear with both links", || {
+            api.grabber().ok()?.into_iter().find(|p| p.name == NAME && p.links.len() == 2)
+        });
+        println!("created: {} ({})", pkg.name, pkg.uuid);
+
+        let urls = api.download_urls(&[], &[pkg.uuid], true).expect("download urls");
+        println!("urls: {urls:?}");
+        assert_eq!(urls.len(), 2);
+
+        api.check_online_status(&[], &[pkg.uuid], true).expect("online status check");
+
+        let first = pkg.links[0].uuid;
+        api.move_to_new_package(&[first], &[], "jdtui-reshape-new", "", true).expect("move to new package");
+        wait_for("the new package to appear", || {
+            api.grabber().ok()?.into_iter().find(|p| p.name == "jdtui-reshape-new").map(|_| ())
+        });
+        println!("moved one link to a new package");
+
+        api.split_by_hoster(&[], &[pkg.uuid], true).expect("split by hoster");
+
+        // Everything of ours goes, whatever shape it ended up in.
+        let ours: Vec<i64> =
+            api.grabber().unwrap().iter().filter(|p| p.name.starts_with("jdtui-reshape")).map(|p| p.uuid).collect();
+        println!("removing {} package(s)", ours.len());
+        api.remove(&[], &ours, true).expect("remove");
+        wait_for("our packages to disappear", || {
+            api.grabber().ok()?.iter().all(|p| !p.name.starts_with("jdtui-reshape")).then_some(())
+        });
     }
 }
