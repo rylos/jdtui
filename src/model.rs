@@ -177,6 +177,10 @@ pub enum Action {
     SplitByHoster,
     /// Show the urls of the selection and copy them to the clipboard.
     Urls,
+    /// Clear the skip reason of skipped links; downloads only.
+    Unskip,
+    /// Re-check whether the links are still online.
+    CheckOnline,
     Properties,
 }
 
@@ -209,6 +213,7 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row], stop_mark: Opt
         let mut v = vec![
             entry(format!("Force download{suffix}"), Action::Force, false),
             entry(format!("Resume{suffix}"), Action::Resume, false),
+            entry(format!("Unskip{suffix}"), Action::Unskip, false),
             toggle,
             entry(format!("Reset{suffix}"), Action::Reset, true),
         ];
@@ -233,6 +238,7 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row], stop_mark: Opt
     insert(entry("Move to new package…", Action::NewPackage, false));
     insert(entry("Split by hoster", Action::SplitByHoster, false));
     insert(entry("Copy urls", Action::Urls, false));
+    insert(entry("Check availability", Action::CheckOnline, false));
     if single && !tab.is_grabber() {
         let marked = row_stop_marked(packages, &rows[0], stop_mark);
         insert(entry(if marked { "Remove stop mark" } else { "Stop after this" }, Action::ToggleStopMark, false));
