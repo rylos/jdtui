@@ -61,6 +61,10 @@ for confirmation first.
 
 ![Acting on several links at once](docs/context-menu.png)
 
+The same menu changes the priority of the selection:
+
+![Choosing a priority](docs/priority.png)
+
 Removing from the **Downloads** tab asks what should happen to the files already
 on disk, the same three choices the desktop GUI offers: leave them, move them to
 the recycle bin, or delete them. The two that touch data ask again before

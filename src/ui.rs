@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, BorderType, Cell, Clear, Paragraph, Row as TRow, T
 
 use crate::api::{Link, Package};
 use crate::app::{App, HELP, Mode, Screen};
-use crate::model::{FieldKind, Form, Row, Tab, describe, row_key};
+use crate::model::{FieldKind, Form, PRIORITIES, Row, Tab, describe, row_key};
 
 // --- palette ----------------------------------------------------------------
 //
@@ -304,6 +304,7 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
     let side_width = match app.mode {
         Mode::Menu => 34,
         Mode::RemoveChoice | Mode::Confirm(crate::model::Action::RemoveWith(_)) => 46,
+        Mode::PriorityChoice => 34,
         Mode::Properties => 62,
         _ => 0,
     };
@@ -347,6 +348,7 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
             Mode::RemoveChoice | Mode::Confirm(crate::model::Action::RemoveWith(_)) => {
                 draw_remove_choice(frame, app, side)
             }
+            Mode::PriorityChoice => draw_priority_choice(frame, app, side),
             Mode::Properties => draw_properties(frame, app, side),
             _ => {}
         }
@@ -582,6 +584,25 @@ fn draw_remove_choice(frame: &mut Frame, app: &App, area: Rect) {
         };
         lines.push(Line::from(Span::styled(format!(" {} {}", if selected { "›" } else { " " }, mode.label()), style)));
     }
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
+fn draw_priority_choice(frame: &mut Frame, app: &App, area: Rect) {
+    let targets = app.target_rows();
+    let block = panel(&format!("Priority of {}", describe(&targets)), Some("Enter choose · Esc cancel"));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let lines: Vec<Line> = PRIORITIES
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            let selected = i == app.priority_index;
+            let style = if selected { selected_style() } else { Style::new() };
+            let label = format!("{}{}", &p[..1], p[1..].to_lowercase());
+            Line::from(Span::styled(format!(" {} {label}", if selected { "›" } else { " " }), style))
+        })
+        .collect();
     frame.render_widget(Paragraph::new(lines), inner);
 }
 

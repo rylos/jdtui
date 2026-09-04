@@ -301,6 +301,13 @@ fn main() {
     app.mode = Mode::Menu;
     shot("context-menu", &app);
 
+    // Choosing a priority for the selection.
+    let mut app = base();
+    app.cursor = 2;
+    app.mode = Mode::PriorityChoice;
+    app.priority_index = 2;
+    shot("priority", &app);
+
     // Removing asks about the files on disk.
     let mut app = base();
     app.cursor = 0;

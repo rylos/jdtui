@@ -338,6 +338,60 @@ impl JdApi {
         )
     }
 
+    pub fn set_priority(&mut self, priority: &str, links: &[i64], packages: &[i64], grabber: bool) -> Result<()> {
+        let path = if grabber { "/linkgrabberv2/setPriority" } else { "/downloadsV2/setPriority" };
+        self.call_unit(path, &[json!(priority), json!(links), json!(packages)])
+    }
+
+    pub fn rename_package(&mut self, package: i64, name: &str, grabber: bool) -> Result<()> {
+        let path = if grabber { "/linkgrabberv2/renamePackage" } else { "/downloadsV2/renamePackage" };
+        self.call_unit(path, &[json!(package), json!(name)])
+    }
+
+    pub fn rename_link(&mut self, link: i64, name: &str, grabber: bool) -> Result<()> {
+        let path = if grabber { "/linkgrabberv2/renameLink" } else { "/downloadsV2/renameLink" };
+        self.call_unit(path, &[json!(link), json!(name)])
+    }
+
+    /// Packages only: the API has no per-link download folder.
+    pub fn set_download_directory(&mut self, directory: &str, packages: &[i64], grabber: bool) -> Result<()> {
+        let path = if grabber { "/linkgrabberv2/setDownloadDirectory" } else { "/downloadsV2/setDownloadDirectory" };
+        self.call_unit(path, &[json!(directory), json!(packages)])
+    }
+
+    /// Continue interrupted links from where they stopped, unlike `reset`.
+    pub fn resume(&mut self, links: &[i64], packages: &[i64]) -> Result<()> {
+        self.call_unit("/downloadsV2/resumeLinks", &[json!(links), json!(packages)])
+    }
+
+    /// Uuid of the link or package downloads stop after, `None` when unset.
+    pub fn stop_mark(&mut self) -> Result<Option<i64>> {
+        let id: i64 = self.call("/downloadsV2/getStopMark", &[])?;
+        Ok((id > 0).then_some(id))
+    }
+
+    /// Exactly one of `link` and `package`, as the API takes it.
+    pub fn set_stop_mark(&mut self, link: Option<i64>, package: Option<i64>) -> Result<()> {
+        self.call_unit("/downloadsV2/setStopMark", &[json!(link.unwrap_or(-1)), json!(package.unwrap_or(-1))])
+    }
+
+    pub fn remove_stop_mark(&mut self) -> Result<()> {
+        self.call_unit("/downloadsV2/removeStopMark", &[])
+    }
+
+    pub fn is_collecting(&mut self) -> Result<bool> {
+        self.call("/linkgrabberv2/isCollecting", &[])
+    }
+
+    /// Stop every running crawl job.
+    pub fn abort_collecting(&mut self) -> Result<()> {
+        self.call_unit("/linkgrabberv2/abort", &[])
+    }
+
+    pub fn clear_grabber(&mut self) -> Result<()> {
+        self.call_unit("/linkgrabberv2/clearList", &[])
+    }
+
     pub fn move_to_downloads(&mut self, links: &[i64], packages: &[i64]) -> Result<()> {
         self.call_unit("/linkgrabberv2/moveToDownloadlist", &[json!(links), json!(packages)])
     }
