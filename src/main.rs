@@ -1,6 +1,6 @@
 //! jdtui — a terminal UI for JDownloader 2, over the My.JDownloader API.
 
-use std::io::stdout;
+use std::io::{Write, stdout};
 use std::time::Duration;
 
 use anyhow::Result;
@@ -57,6 +57,9 @@ fn run(terminal: &mut ratatui::DefaultTerminal, mut app: App) -> Result<()> {
     while !app.should_quit {
         app.tick();
         terminal.draw(|frame| ui::draw(frame, &app))?;
+        if let Some(text) = app.clipboard.take() {
+            copy_to_clipboard(&text);
+        }
 
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
@@ -71,6 +74,16 @@ fn run(terminal: &mut ratatui::DefaultTerminal, mut app: App) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// OSC 52: the terminal puts the text on the clipboard, wherever it runs;
+/// ignored by terminals that do not support it.
+fn copy_to_clipboard(text: &str) {
+    use base64::Engine as _;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(text);
+    let mut out = stdout();
+    let _ = write!(out, "\x1b]52;c;{encoded}\x07");
+    let _ = out.flush();
 }
 
 fn translate(code: KeyCode, modifiers: KeyModifiers) -> Option<Key> {

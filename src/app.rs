@@ -49,6 +49,8 @@ pub enum Mode {
     NewPackage,
     /// The full key reference; the footer only shows the frequent ones.
     Help,
+    /// The urls of the selection, in `urls`.
+    Urls,
 }
 
 /// Every key of the main screen, grouped for the help panel. The README's
@@ -77,6 +79,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
             ("p", "Properties of the selected row"),
             ("n", "Add links to the Link Grabber"),
             ("t", "Stop after this row (again to clear)"),
+            ("y", "Copy the urls of the selection"),
         ],
     ),
     (
@@ -139,6 +142,12 @@ pub struct App {
     pub priority_index: usize,
     pub form: Option<Form>,
 
+    /// Urls shown by `Mode::Urls`.
+    pub urls: Vec<String>,
+    /// Text to put on the system clipboard at the next frame; the binary
+    /// sends it as an OSC 52 sequence, the only way out of a remote shell.
+    pub clipboard: Option<String>,
+
     /// Footer message and whether it is an error.
     pub message: Option<(String, bool)>,
     /// Last refresh failure, shown in the header until a refresh succeeds.
@@ -167,6 +176,8 @@ impl App {
             remove_index: 0,
             priority_index: 0,
             form: None,
+            urls: Vec::new(),
+            clipboard: None,
             message: None,
             refresh_error: None,
         };
@@ -202,6 +213,8 @@ impl App {
             remove_index: 0,
             priority_index: 0,
             form: None,
+            urls: Vec::new(),
+            clipboard: None,
             message: None,
             refresh_error: None,
         };
@@ -404,6 +417,10 @@ impl App {
                 self.mode = Mode::Directory;
                 return;
             }
+            Action::Urls => {
+                self.copy_urls();
+                return;
+            }
             Action::NewPackage => {
                 self.form = Some(Form::new_package());
                 self.mode = Mode::NewPackage;
@@ -460,7 +477,8 @@ impl App {
             | Action::Directory
             | Action::ToggleStopMark
             | Action::ClearGrabber
-            | Action::NewPackage => unreachable!(),
+            | Action::NewPackage
+            | Action::Urls => unreachable!(),
         };
         self.finish(outcome);
     }
@@ -572,6 +590,31 @@ impl App {
         self.finish(outcome);
     }
 
+    /// Fetch the urls of the selection, show them and copy them.
+    fn copy_urls(&mut self) {
+        let targets = self.target_rows();
+        let (links, pkgs) = collect_ids(self.packages(), &targets);
+        let grabber = self.tab.is_grabber();
+        match self.with_api(|a| a.download_urls(&links, &pkgs, grabber)) {
+            Ok(urls) if urls.is_empty() => {
+                self.message = Some(("No urls in the selection".into(), true));
+                self.mode = Mode::List;
+            }
+            Ok(urls) => {
+                let n = urls.len();
+                self.clipboard = Some(urls.join("\n"));
+                self.urls = urls;
+                self.message =
+                    Some((format!("{n} url{} copied to the clipboard", if n == 1 { "" } else { "s" }), false));
+                self.mode = Mode::Urls;
+            }
+            Err(e) => {
+                self.message = Some((format!("Failed: {e}"), true));
+                self.mode = Mode::List;
+            }
+        }
+    }
+
     fn submit_new_package(&mut self) {
         let Some(form) = &self.form else { return };
         let name = form.value("Package name").trim().to_string();
@@ -678,6 +721,12 @@ impl App {
                 Mode::Help => {
                     if matches!(key, Key::Esc | Key::Enter | Key::Char('q' | '?' | 'h')) {
                         self.mode = Mode::List;
+                    }
+                }
+                Mode::Urls => {
+                    if matches!(key, Key::Esc | Key::Enter | Key::Char('q' | 'y')) {
+                        self.mode = Mode::List;
+                        self.message = None;
                     }
                 }
             },
@@ -792,6 +841,11 @@ impl App {
             Key::Char('P') => self.toggle_pause(),
             Key::Char('t') if !self.tab.is_grabber() => self.toggle_stop_mark(),
             Key::Char('d') => self.choose_device(),
+            Key::Char('y') => {
+                if self.current_row().is_some() {
+                    self.copy_urls();
+                }
+            }
             Key::Char('?' | 'h') => self.mode = Mode::Help,
             Key::Char('C') if self.tab.is_grabber() => {
                 if self.snapshot.grabber.is_empty() {

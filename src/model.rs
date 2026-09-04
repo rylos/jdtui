@@ -175,6 +175,8 @@ pub enum Action {
     /// Open the new-package form for the selection.
     NewPackage,
     SplitByHoster,
+    /// Show the urls of the selection and copy them to the clipboard.
+    Urls,
     Properties,
 }
 
@@ -230,6 +232,7 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row], stop_mark: Opt
     }
     insert(entry("Move to new package…", Action::NewPackage, false));
     insert(entry("Split by hoster", Action::SplitByHoster, false));
+    insert(entry("Copy urls", Action::Urls, false));
     if single && !tab.is_grabber() {
         let marked = row_stop_marked(packages, &rows[0], stop_mark);
         insert(entry(if marked { "Remove stop mark" } else { "Stop after this" }, Action::ToggleStopMark, false));

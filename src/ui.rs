@@ -344,6 +344,11 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         draw_help(frame, area);
         return;
     }
+    if app.mode == Mode::Urls {
+        draw_list(frame, app, list_area);
+        draw_urls(frame, app, area);
+        return;
+    }
 
     draw_list(frame, app, list_area);
     if let Some(side) = side_area {
@@ -781,6 +786,19 @@ fn draw_help(frame: &mut Frame, area: Rect) {
         text.extend(lines);
         frame.render_widget(Paragraph::new(text), cols[i]);
     }
+}
+
+fn draw_urls(frame: &mut Frame, app: &App, area: Rect) {
+    let n = app.urls.len();
+    let height = (n as u16 + 4).min(area.height);
+    let popup = centered(area, area.width.saturating_sub(8).min(120), height);
+    frame.render_widget(Clear, popup);
+    let block = panel(&format!("{n} url{}, copied to the clipboard", if n == 1 { "" } else { "s" }), Some("Esc close"));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    let mut lines = vec![Line::raw("")];
+    lines.extend(app.urls.iter().map(|u| Line::from(format!(" {u}"))));
+    frame.render_widget(Paragraph::new(lines), inner);
 }
 
 fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
