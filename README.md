@@ -26,8 +26,8 @@ jdtui
 You are asked for your My.JDownloader email and password. After the first
 successful sign in they are saved to the config file (mode `0600`) and not asked
 again unless they stop working. If the account has more than one JDownloader,
-you pick one; the choice is remembered. Use `jdtui --choose-device` to pick
-again.
+you pick one; the choice is remembered. Press `d` at any time to switch to
+another one, or start with `jdtui --choose-device`.
 
 ## Keys
 
@@ -43,6 +43,7 @@ again.
 | `p` | Properties of the selected row |
 | `n` | Add links to the Link Grabber |
 | `s` | Start / stop downloads |
+| `d` | Switch to another JDownloader of the account |
 | `c` | Move the whole Link Grabber to the download list |
 | `q` | Quit |
 

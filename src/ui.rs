@@ -162,7 +162,7 @@ fn draw_login(frame: &mut Frame, form: &Form, error: Option<&str>) {
 fn draw_devices(frame: &mut Frame, devices: &[crate::myjd::Device], index: usize) {
     let area = centered(frame.area(), 60, (devices.len() as u16 + 4).min(frame.area().height));
     frame.render_widget(Clear, area);
-    let block = panel("Choose a JDownloader", Some("Enter select · Esc quit"));
+    let block = panel("Choose a JDownloader", Some("Enter select · Esc back"));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -679,6 +679,9 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
                 sep(),
                 key("s"),
                 label(" start/stop"),
+                sep(),
+                key("d"),
+                label(" device"),
                 sep(),
                 key("q"),
                 label(" quit"),

@@ -137,6 +137,21 @@ impl JdApi {
         Self { myjd, device_id }
     }
 
+    pub fn list_devices(&mut self) -> Result<Vec<crate::myjd::Device>> {
+        match self.myjd.list_devices() {
+            Err(e) if e.is_session_expired() => {
+                self.myjd.reconnect()?;
+                self.myjd.list_devices()
+            }
+            other => other,
+        }
+    }
+
+    /// Point the same session at another JDownloader of the account.
+    pub fn set_device(&mut self, device_id: String) {
+        self.device_id = device_id;
+    }
+
     /// One device call, with a single transparent reconnect when the session
     /// has expired in the meantime.
     fn call<T: serde::de::DeserializeOwned>(&mut self, path: &str, params: &[Value]) -> Result<T> {
