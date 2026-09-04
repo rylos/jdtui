@@ -7,7 +7,7 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, BorderType, Cell, Clear, Paragraph, Row as TRow, Table, TableState, Tabs};
 
 use crate::api::{Link, Package};
-use crate::app::{App, Mode, Screen};
+use crate::app::{App, HELP, Mode, Screen};
 use crate::model::{FieldKind, Form, Row, Tab, describe, row_key};
 
 // --- palette ----------------------------------------------------------------
@@ -329,6 +329,12 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         let mut lines = vec![Line::raw("")];
         lines.extend(form_lines(form));
         frame.render_widget(Paragraph::new(lines), inner);
+        return;
+    }
+
+    if app.mode == Mode::Help {
+        draw_list(frame, app, list_area);
+        draw_help(frame, area);
         return;
     }
 
@@ -667,6 +673,50 @@ fn draw_properties(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(table, inner);
 }
 
+fn draw_help(frame: &mut Frame, area: Rect) {
+    let key_width = HELP.iter().flat_map(|(_, keys)| keys.iter()).map(|(k, _)| k.chars().count()).max().unwrap_or(8);
+    let section_lines = |section: &str, keys: &[(&str, &str)]| -> Vec<Line<'static>> {
+        let mut lines = vec![Line::from(Span::styled(format!(" {section}"), Style::new().fg(accent()).bold()))];
+        for (key, what) in keys {
+            lines.push(Line::from(vec![
+                Span::styled(format!("   {key:<w$}  ", w = key_width), Style::new().bold()),
+                Span::raw(what.to_string()),
+            ]));
+        }
+        lines
+    };
+
+    // Two columns when the terminal is wide enough, so 24 rows are enough
+    // to show everything; one otherwise.
+    let two_columns = area.width >= 120;
+    let mut columns: Vec<Vec<Line>> = vec![Vec::new(), Vec::new()];
+    let total: usize = HELP.iter().map(|(_, k)| k.len() + 2).sum();
+    let mut filled = 0;
+    for (section, keys) in HELP {
+        let col = if two_columns && filled + keys.len() + 2 > total / 2 { 1 } else { 0 };
+        if !columns[col].is_empty() {
+            columns[col].push(Line::raw(""));
+        }
+        columns[col].extend(section_lines(section, keys));
+        filled += keys.len() + 2;
+    }
+
+    let column_width = 58u16;
+    let width = if two_columns { column_width * 2 + 2 } else { column_width + 2 };
+    let height = (columns.iter().map(|c| c.len()).max().unwrap_or(0) as u16 + 3).min(area.height);
+    let popup = centered(area, width, height);
+    frame.render_widget(Clear, popup);
+    let block = panel("Keys", Some("Esc close"));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    let cols = Layout::horizontal([Constraint::Length(column_width), Constraint::Fill(1)]).split(inner);
+    for (i, lines) in columns.into_iter().enumerate() {
+        let mut text = vec![Line::raw("")];
+        text.extend(lines);
+        frame.render_widget(Paragraph::new(text), cols[i]);
+    }
+}
+
 fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
     let line = match (&app.mode, &app.message) {
         (Mode::Confirm(_), Some((m, _))) => Line::from(Span::styled(m.clone(), Style::new().fg(Color::Yellow).bold())),
@@ -678,6 +728,7 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
             let key = |k: &'static str| Span::styled(k, Style::new().bold());
             let sep = || Span::styled("  |  ", Style::new().dim());
             let label = |t: &'static str| Span::styled(t, Style::new().dim());
+            // The frequent keys only; `?` lists them all.
             Line::from(vec![
                 key("Tab"),
                 label(" switch"),
@@ -685,20 +736,11 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
                 key("↑↓"),
                 label(" move"),
                 sep(),
-                key("→←"),
-                label(" expand"),
-                sep(),
                 key("Space"),
                 label(" mark"),
                 sep(),
-                key("a"),
-                label(" all"),
-                sep(),
                 key("Enter"),
                 label(" menu"),
-                sep(),
-                key("p"),
-                label(" properties"),
                 sep(),
                 key("n"),
                 label(" add links"),
@@ -706,8 +748,8 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
                 key("s"),
                 label(" start/stop"),
                 sep(),
-                key("d"),
-                label(" device"),
+                key("?"),
+                label(" help"),
                 sep(),
                 key("q"),
                 label(" quit"),

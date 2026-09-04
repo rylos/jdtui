@@ -47,7 +47,12 @@ another one, or start with `jdtui --choose-device`.
 | `s` | Start / stop downloads |
 | `d` | Switch to another JDownloader of the account |
 | `c` | Move the whole Link Grabber to the download list |
+| `?` | Show every key |
 | `q` | Quit |
+
+The footer shows the frequent keys; `?` opens the full list.
+
+![The key reference](docs/help.png)
 
 The context menu acts on every marked row at once, so a dozen links can be
 forced, reset, disabled or removed in a single action. Destructive entries ask
