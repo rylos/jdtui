@@ -451,6 +451,10 @@ impl App {
             Action::SplitByHoster => {
                 self.with_api(|a| a.split_by_hoster(&links, &pkgs, grabber)).map(|_| format!("{what} split by hoster"))
             }
+            Action::Unskip => self.with_api(|a| a.unskip(&links, &pkgs)).map(|_| format!("{what} unskipped")),
+            Action::CheckOnline => self
+                .with_api(|a| a.check_online_status(&links, &pkgs, grabber))
+                .map(|_| format!("Availability check started on {what}")),
             Action::Resume => self.with_api(|a| a.resume(&links, &pkgs)).map(|_| format!("{what} resumed")),
             Action::Reset => self.with_api(|a| a.reset(&links, &pkgs)).map(|_| format!("{what} reset")),
             Action::Remove => self.with_api(|a| a.remove(&links, &pkgs, grabber)).map(|_| format!("{what} removed")),
