@@ -172,6 +172,9 @@ pub enum Action {
     Rename,
     /// Open the download folder form; packages only.
     Directory,
+    /// Open the new-package form for the selection.
+    NewPackage,
+    SplitByHoster,
     Properties,
 }
 
@@ -225,6 +228,8 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row], stop_mark: Opt
     if rows.iter().all(|r| r.is_package()) {
         insert(entry("Set download folder…", Action::Directory, false));
     }
+    insert(entry("Move to new package…", Action::NewPackage, false));
+    insert(entry("Split by hoster", Action::SplitByHoster, false));
     if single && !tab.is_grabber() {
         let marked = row_stop_marked(packages, &rows[0], stop_mark);
         insert(entry(if marked { "Remove stop mark" } else { "Stop after this" }, Action::ToggleStopMark, false));
@@ -314,6 +319,17 @@ impl Form {
         let mut dir = Field::text("Save to", "absolute path on the JDownloader machine");
         dir.text = current.to_string();
         Form { title: "Download folder", fields: vec![dir], index: 0 }
+    }
+
+    pub fn new_package() -> Self {
+        Form {
+            title: "Move to a new package",
+            fields: vec![
+                Field::text("Package name", ""),
+                Field::text("Save to", "leave empty to keep the current folder"),
+            ],
+            index: 0,
+        }
     }
 
     pub fn value(&self, label: &str) -> &str {

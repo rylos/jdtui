@@ -319,7 +319,7 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         (area, None)
     };
 
-    if matches!(app.mode, Mode::Add | Mode::Rename | Mode::Directory)
+    if matches!(app.mode, Mode::Add | Mode::Rename | Mode::Directory | Mode::NewPackage)
         && let Some(form) = &app.form
     {
         draw_list(frame, app, list_area);
