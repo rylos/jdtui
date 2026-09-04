@@ -45,6 +45,8 @@ pub enum Mode {
     Rename,
     /// Editing the download folder of the selected packages, in `form`.
     Directory,
+    /// Naming the package the selection moves into, in `form`.
+    NewPackage,
     /// The full key reference; the footer only shows the frequent ones.
     Help,
 }
@@ -402,6 +404,11 @@ impl App {
                 self.mode = Mode::Directory;
                 return;
             }
+            Action::NewPackage => {
+                self.form = Some(Form::new_package());
+                self.mode = Mode::NewPackage;
+                return;
+            }
             Action::Priority => {
                 // Start from the current priority when there is one row.
                 let current = if targets.len() == 1 { row_priority(self.packages(), &targets[0]) } else { None };
@@ -423,6 +430,9 @@ impl App {
                 .map(|_| format!("{what} {}", if any_enabled { "disabled" } else { "enabled" })),
             Action::Force => {
                 self.with_api(|a| a.force_download(&links, &pkgs)).map(|_| format!("{what} forced to start"))
+            }
+            Action::SplitByHoster => {
+                self.with_api(|a| a.split_by_hoster(&links, &pkgs, grabber)).map(|_| format!("{what} split by hoster"))
             }
             Action::Resume => self.with_api(|a| a.resume(&links, &pkgs)).map(|_| format!("{what} resumed")),
             Action::Reset => self.with_api(|a| a.reset(&links, &pkgs)).map(|_| format!("{what} reset")),
@@ -449,7 +459,8 @@ impl App {
             | Action::Rename
             | Action::Directory
             | Action::ToggleStopMark
-            | Action::ClearGrabber => unreachable!(),
+            | Action::ClearGrabber
+            | Action::NewPackage => unreachable!(),
         };
         self.finish(outcome);
     }
@@ -561,6 +572,27 @@ impl App {
         self.finish(outcome);
     }
 
+    fn submit_new_package(&mut self) {
+        let Some(form) = &self.form else { return };
+        let name = form.value("Package name").trim().to_string();
+        let dir = form.value("Save to").trim().to_string();
+        if name.is_empty() {
+            self.message = Some(("The package name cannot be empty".into(), true));
+            return;
+        }
+        let targets = self.target_rows();
+        let (links, pkgs) = collect_ids(self.packages(), &targets);
+        let grabber = self.tab.is_grabber();
+        let what = describe(&targets);
+        let outcome = self
+            .with_api(|a| a.move_to_new_package(&links, &pkgs, &name, &dir, grabber))
+            .map(|_| format!("{what} moved to '{}'", truncate(&name, 40)));
+        if outcome.is_ok() {
+            self.form = None;
+        }
+        self.finish(outcome);
+    }
+
     fn submit_directory(&mut self) {
         let Some(form) = &self.form else { return };
         let dir = form.value("Save to").trim().to_string();
@@ -642,7 +674,7 @@ impl App {
                         self.mode = Mode::List;
                     }
                 },
-                Mode::Add | Mode::Rename | Mode::Directory => self.handle_form_key(key),
+                Mode::Add | Mode::Rename | Mode::Directory | Mode::NewPackage => self.handle_form_key(key),
                 Mode::Help => {
                     if matches!(key, Key::Esc | Key::Enter | Key::Char('q' | '?' | 'h')) {
                         self.mode = Mode::List;
@@ -840,6 +872,7 @@ impl App {
             Key::Enter => match self.mode {
                 Mode::Rename => self.submit_rename(),
                 Mode::Directory => self.submit_directory(),
+                Mode::NewPackage => self.submit_new_package(),
                 _ => self.submit_add_form(),
             },
             other => {
