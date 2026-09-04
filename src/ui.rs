@@ -364,6 +364,11 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         draw_urls(frame, app, area);
         return;
     }
+    if app.mode == Mode::Accounts {
+        draw_list(frame, app, list_area);
+        draw_accounts(frame, app, area);
+        return;
+    }
 
     draw_list(frame, app, list_area);
     if let Some(side) = side_area {
@@ -814,6 +819,58 @@ fn draw_urls(frame: &mut Frame, app: &App, area: Rect) {
     let mut lines = vec![Line::raw("")];
     lines.extend(app.urls.iter().map(|u| Line::from(format!(" {u}"))));
     frame.render_widget(Paragraph::new(lines), inner);
+}
+
+fn draw_accounts(frame: &mut Frame, app: &App, area: Rect) {
+    let n = app.accounts.len();
+    let height = (n as u16 + 5).min(area.height);
+    let popup = centered(area, area.width.saturating_sub(8).min(110), height);
+    frame.render_widget(Clear, popup);
+    let block = panel("Accounts", Some("Enter enable/disable · r refresh · R refresh all · Esc close"));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    if n == 0 {
+        frame.render_widget(Paragraph::new(Line::from(" No accounts on this JDownloader").dim().italic()), inner);
+        return;
+    }
+    let rows: Vec<TRow> = app
+        .accounts
+        .iter()
+        .enumerate()
+        .map(|(i, a)| {
+            let selected = i == app.account_index;
+            let enabled = a.enabled.unwrap_or(false);
+            let (status, color) = match (enabled, a.valid, &a.error_string) {
+                (false, _, _) => ("disabled".to_string(), Color::DarkGray),
+                (true, _, Some(e)) if !e.is_empty() => (e.clone(), Color::Red),
+                (true, Some(false), _) => ("invalid".to_string(), Color::Red),
+                (true, Some(true), _) => ("ok".to_string(), Color::Green),
+                (true, None, _) => ("unchecked".to_string(), Color::Yellow),
+            };
+            let traffic = match (a.traffic_left, a.traffic_max) {
+                (Some(left), Some(max)) if max > 0 => format!("{} / {}", human_size(left), human_size(max)),
+                (Some(left), _) if left >= 0 => human_size(left),
+                _ => "unlimited".to_string(),
+            };
+            let until = a.valid_until.filter(|d| *d > 0).map(human_time).unwrap_or_else(|| "-".into());
+            let style = if selected { selected_style() } else { Style::new() };
+            TRow::new(vec![
+                Cell::from(format!(" {} {}", if selected { "›" } else { " " }, a.hostname.clone().unwrap_or_default())),
+                Cell::from(a.username.clone().unwrap_or_default()),
+                Cell::from(Span::styled(status, Style::new().fg(color))),
+                Cell::from(traffic),
+                Cell::from(Span::styled(until, Style::new().dim())),
+            ])
+            .style(style)
+        })
+        .collect();
+    let widths =
+        [Constraint::Fill(2), Constraint::Fill(2), Constraint::Fill(2), Constraint::Length(22), Constraint::Length(17)];
+    let table = Table::new(rows, widths)
+        .header(TRow::new(vec!["  Hoster", "User", "Status", "Traffic left", "Valid until"]).style(Style::new().bold()))
+        .column_spacing(1);
+    frame.render_widget(table, inner);
 }
 
 fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
