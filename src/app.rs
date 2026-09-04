@@ -161,15 +161,47 @@ impl App {
     }
 
     fn select_device(&mut self, device: Device) {
-        let Some(myjd) = self.myjd.take() else { return };
         self.config.device = Some(device.id.clone());
         let _ = self.config.save();
         self.device_name = device.name.clone();
 
+        if let Some(api) = &self.api {
+            // Switching from the main screen: keep the session, swap the target.
+            if let Ok(mut a) = api.lock() {
+                a.set_device(device.id);
+            }
+            self.snapshot = Snapshot::default();
+            self.rows.clear();
+            self.cursor = 0;
+            self.expanded.clear();
+            self.marked.clear();
+            self.mode = Mode::List;
+            if let Some(p) = &self.poller {
+                p.refresh_now();
+            }
+            self.screen = Screen::Main;
+            return;
+        }
+
+        let Some(myjd) = self.myjd.take() else { return };
         let api = Arc::new(Mutex::new(JdApi::new(myjd, device.id)));
         self.poller = Some(Poller::start(api.clone(), Duration::from_millis(self.config.refresh_ms())));
         self.api = Some(api);
         self.screen = Screen::Main;
+    }
+
+    /// Reopen the device picker from the main screen.
+    fn choose_device(&mut self) {
+        match self.with_api(|a| a.list_devices()) {
+            Ok(devices) if devices.is_empty() => {
+                self.message = Some(("No JDownloader is connected to this account".into(), true))
+            }
+            Ok(devices) => {
+                let index = devices.iter().position(|d| Some(&d.id) == self.config.device.as_ref()).unwrap_or(0);
+                self.screen = Screen::Devices { devices, index };
+            }
+            Err(e) => self.message = Some((format!("Could not list devices: {e}"), true)),
+        }
     }
 
     /// Drain what the poller produced since the last frame.
@@ -389,7 +421,14 @@ impl App {
                 let d = devices[*index].clone();
                 self.select_device(d);
             }
-            Key::Esc | Key::Char('q') => self.should_quit = true,
+            Key::Esc | Key::Char('q') => {
+                // From the main screen this is a cancel, not a quit.
+                if self.api.is_some() {
+                    self.screen = Screen::Main;
+                } else {
+                    self.should_quit = true;
+                }
+            }
             _ => {}
         }
     }
@@ -458,6 +497,7 @@ impl App {
                 self.mode = Mode::Add;
             }
             Key::Char('s') => self.toggle_downloads(),
+            Key::Char('d') => self.choose_device(),
             Key::Char('c') if self.tab.is_grabber() => {
                 let pkgs: Vec<i64> = self.snapshot.grabber.iter().map(|p| p.uuid).collect();
                 if pkgs.is_empty() {
