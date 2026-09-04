@@ -18,6 +18,9 @@ pub struct Config {
     pub device: Option<String>,
     /// Interface refresh period in milliseconds.
     pub refresh_ms: Option<u64>,
+    /// Listen to JDownloader's event channel (default true): changes show
+    /// up at once, and the refresh slows down while nothing downloads.
+    pub events: Option<bool>,
 }
 
 impl Config {
@@ -51,6 +54,10 @@ impl Config {
 
     pub fn refresh_ms(&self) -> u64 {
         self.refresh_ms.unwrap_or(1000).max(200)
+    }
+
+    pub fn events(&self) -> bool {
+        self.events.unwrap_or(true)
     }
 }
 

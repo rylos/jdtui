@@ -264,6 +264,9 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
 
     let cols = Layout::horizontal([Constraint::Ratio(1, 3); 3]).split(inner);
     let mut state_line = vec![Span::raw("State: "), Span::styled(state_text, Style::new().fg(state_color).bold())];
+    if app.events_live {
+        state_line.push(Span::styled(" · live", Style::new().dim()));
+    }
     // What is waiting on someone or something, next to the state.
     let captchas = app.snapshot.captchas.len();
     if captchas > 0 {

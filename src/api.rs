@@ -184,6 +184,15 @@ impl RemoveMode {
     }
 }
 
+/// One notification from the JDownloader event channel.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Event {
+    pub eventid: String,
+    pub publisher: String,
+    #[serde(rename = "eventData")]
+    pub event_data: Option<Value>,
+}
+
 /// One of the forms a link can be downloaded in, such as a video quality.
 #[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -281,6 +290,22 @@ impl JdApi {
             Err(e) if e.is_session_expired() => {
                 self.myjd.reconnect()?;
                 self.myjd.device_call(&self.device_id, path, params)
+            }
+            other => other,
+        }
+    }
+
+    /// Like `call`, for calls that block on the device side.
+    fn call_long<T: serde::de::DeserializeOwned>(
+        &mut self,
+        path: &str,
+        params: &[Value],
+        timeout: std::time::Duration,
+    ) -> Result<T> {
+        match self.myjd.device_call_with_timeout(&self.device_id, path, params, Some(timeout)) {
+            Err(e) if e.is_session_expired() => {
+                self.myjd.reconnect()?;
+                self.myjd.device_call_with_timeout(&self.device_id, path, params, Some(timeout))
             }
             other => other,
         }
@@ -586,6 +611,44 @@ impl JdApi {
 
     pub fn set_variant(&mut self, link: i64, variant_id: &str) -> Result<()> {
         self.call_unit("/linkgrabberv2/setVariant", &[json!(link), json!(variant_id)])
+    }
+
+    // --- events -----------------------------------------------------------
+    //
+    // Everything that changes what the interface shows, minus the per-second
+    // progress noise, which the periodic refresh covers while downloading.
+    // Patterns are Java regexes searched in "publisher.eventid".
+
+    pub const EVENT_SUBSCRIPTIONS: &'static [&'static str] = &[
+        "^downloadwatchdog",
+        "^downloads\\.(REFRESH_STRUCTURE|REMOVE_|ADD_|REFRESH_CONTENT)",
+        "^downloads\\.(LINK|PACKAGE)_UPDATE\\.(enabled|finished|priority|saveTo|skipped|extractionStatus)$",
+        "^linkcollector",
+        "^linkcrawler",
+        "^captchas",
+        "^extraction",
+    ];
+
+    /// Poll timeout JDownloader applies to `listen`; its default.
+    pub const EVENT_POLL: std::time::Duration = std::time::Duration::from_secs(25);
+
+    /// Open an event subscription; returns its id.
+    pub fn subscribe_events(&mut self) -> Result<i64> {
+        #[derive(Deserialize)]
+        struct Sub {
+            subscriptionid: i64,
+        }
+        let sub: Sub = self.call("/events/subscribe", &[json!(Self::EVENT_SUBSCRIPTIONS), json!([])])?;
+        Ok(sub.subscriptionid)
+    }
+
+    /// Block until events arrive or the poll timeout passes (then empty).
+    pub fn listen_events(&mut self, subscription: i64) -> Result<Vec<Event>> {
+        self.call_long("/events/listen", &[json!(subscription)], Self::EVENT_POLL + std::time::Duration::from_secs(15))
+    }
+
+    pub fn unsubscribe_events(&mut self, subscription: i64) -> Result<()> {
+        self.call_unit("/events/unsubscribe", &[json!(subscription)])
     }
 
     pub fn is_collecting(&mut self) -> Result<bool> {

@@ -284,6 +284,7 @@ fn demo() -> Snapshot {
 fn base() -> App {
     let mut app = App::with_snapshot(demo());
     app.device_name = "jd2@homeserver".into();
+    app.events_live = true;
     app
 }
 
