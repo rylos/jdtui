@@ -181,6 +181,8 @@ pub enum Action {
     Unskip,
     /// Re-check whether the links are still online.
     CheckOnline,
+    /// Queue the complete archives of the selection for extraction.
+    ExtractNow,
     Properties,
 }
 
@@ -217,6 +219,7 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row], stop_mark: Opt
             toggle,
             entry(format!("Reset{suffix}"), Action::Reset, true),
         ];
+        v.push(entry("Extract now", Action::ExtractNow, false));
         if rows.iter().any(|r| r.is_package()) {
             v.push(entry("Delete finished links", Action::Cleanup, true));
         }
@@ -328,6 +331,14 @@ impl Form {
         let mut dir = Field::text("Save to", "absolute path on the JDownloader machine");
         dir.text = current.to_string();
         Form { title: "Download folder", fields: vec![dir], index: 0 }
+    }
+
+    pub fn archive_password() -> Self {
+        Form {
+            title: "Add an archive password",
+            fields: vec![Field::text("Password", "added to the list JDownloader tries on every archive")],
+            index: 0,
+        }
     }
 
     pub fn new_package() -> Self {

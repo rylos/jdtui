@@ -257,8 +257,23 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(block, area);
 
     let cols = Layout::horizontal([Constraint::Ratio(1, 3); 3]).split(inner);
+    let mut state_line = vec![Span::raw("State: "), Span::styled(state_text, Style::new().fg(state_color).bold())];
+    // What is waiting on someone or something, next to the state.
+    let captchas = app.snapshot.captchas.len();
+    if captchas > 0 {
+        state_line.push(Span::raw("  |  "));
+        state_line.push(Span::styled(
+            format!("{captchas} captcha{} waiting", if captchas == 1 { "" } else { "s" }),
+            Style::new().fg(Color::Red).bold(),
+        ));
+    }
+    let extracting = app.snapshot.extracting.len();
+    if extracting > 0 {
+        state_line.push(Span::raw("  |  "));
+        state_line.push(Span::styled(format!("Extracting: {extracting}"), Style::new().fg(Color::Yellow).bold()));
+    }
     let left = vec![
-        Line::from(vec![Span::raw("State: "), Span::styled(state_text, Style::new().fg(state_color).bold())]),
+        Line::from(state_line),
         Line::from(vec![
             Span::raw("Packages: "),
             Span::styled(dl.len().to_string(), Style::new().bold()),
@@ -319,7 +334,7 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         (area, None)
     };
 
-    if matches!(app.mode, Mode::Add | Mode::Rename | Mode::Directory | Mode::NewPackage)
+    if matches!(app.mode, Mode::Add | Mode::Rename | Mode::Directory | Mode::NewPackage | Mode::ArchivePassword)
         && let Some(form) = &app.form
     {
         draw_list(frame, app, list_area);

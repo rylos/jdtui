@@ -47,6 +47,8 @@ pub enum Mode {
     Directory,
     /// Naming the package the selection moves into, in `form`.
     NewPackage,
+    /// Typing a password for the extraction password list, in `form`.
+    ArchivePassword,
     /// The full key reference; the footer only shows the frequent ones.
     Help,
     /// The urls of the selection, in `urls`.
@@ -80,6 +82,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
             ("n", "Add links to the Link Grabber"),
             ("t", "Stop after this row (again to clear)"),
             ("y", "Copy the urls of the selection"),
+            ("e", "Add an archive password"),
         ],
     ),
     (
@@ -455,6 +458,9 @@ impl App {
             Action::CheckOnline => self
                 .with_api(|a| a.check_online_status(&links, &pkgs, grabber))
                 .map(|_| format!("Availability check started on {what}")),
+            Action::ExtractNow => {
+                self.with_api(|a| a.extract_now(&links, &pkgs)).map(|_| format!("Extraction queued for {what}"))
+            }
             Action::Resume => self.with_api(|a| a.resume(&links, &pkgs)).map(|_| format!("{what} resumed")),
             Action::Reset => self.with_api(|a| a.reset(&links, &pkgs)).map(|_| format!("{what} reset")),
             Action::Remove => self.with_api(|a| a.remove(&links, &pkgs, grabber)).map(|_| format!("{what} removed")),
@@ -619,6 +625,24 @@ impl App {
         }
     }
 
+    fn submit_archive_password(&mut self) {
+        let Some(form) = &self.form else { return };
+        let password = form.value("Password").to_string();
+        if password.is_empty() {
+            self.message = Some(("The password cannot be empty".into(), true));
+            return;
+        }
+        let outcome =
+            self.with_api(|a| a.add_archive_password(&password)).map(|_| "Archive password added".to_string());
+        if outcome.is_ok() {
+            self.form = None;
+        }
+        // Not a selection action: keep the marks.
+        let marked = std::mem::take(&mut self.marked);
+        self.finish(outcome);
+        self.marked = marked;
+    }
+
     fn submit_new_package(&mut self) {
         let Some(form) = &self.form else { return };
         let name = form.value("Package name").trim().to_string();
@@ -721,7 +745,9 @@ impl App {
                         self.mode = Mode::List;
                     }
                 },
-                Mode::Add | Mode::Rename | Mode::Directory | Mode::NewPackage => self.handle_form_key(key),
+                Mode::Add | Mode::Rename | Mode::Directory | Mode::NewPackage | Mode::ArchivePassword => {
+                    self.handle_form_key(key)
+                }
                 Mode::Help => {
                     if matches!(key, Key::Esc | Key::Enter | Key::Char('q' | '?' | 'h')) {
                         self.mode = Mode::List;
@@ -845,6 +871,10 @@ impl App {
             Key::Char('P') => self.toggle_pause(),
             Key::Char('t') if !self.tab.is_grabber() => self.toggle_stop_mark(),
             Key::Char('d') => self.choose_device(),
+            Key::Char('e') => {
+                self.form = Some(Form::archive_password());
+                self.mode = Mode::ArchivePassword;
+            }
             Key::Char('y') => {
                 if self.current_row().is_some() {
                     self.copy_urls();
@@ -931,6 +961,7 @@ impl App {
                 Mode::Rename => self.submit_rename(),
                 Mode::Directory => self.submit_directory(),
                 Mode::NewPackage => self.submit_new_package(),
+                Mode::ArchivePassword => self.submit_archive_password(),
                 _ => self.submit_add_form(),
             },
             other => {

@@ -103,6 +103,15 @@ impl Link {
     }
 }
 
+/// What changes rarely, refreshed less often than the lists.
+#[derive(Debug, Clone, Default)]
+pub struct Status {
+    pub stop_mark: Option<i64>,
+    pub collecting: bool,
+    pub extracting: Vec<ArchiveStatus>,
+    pub captchas: Vec<CaptchaJob>,
+}
+
 /// Everything the interface shows, fetched in one round.
 #[derive(Debug, Clone, Default)]
 pub struct Snapshot {
@@ -114,6 +123,11 @@ pub struct Snapshot {
     pub stop_mark: Option<i64>,
     /// The Link Grabber is still crawling what was added.
     pub collecting: bool,
+    /// Archives being extracted or queued for it.
+    pub extracting: Vec<ArchiveStatus>,
+    /// Captchas JDownloader is waiting on; nothing downloads from those
+    /// hosters until someone solves them.
+    pub captchas: Vec<CaptchaJob>,
     pub downloads: Vec<Package>,
     pub grabber: Vec<Package>,
 }
@@ -319,12 +333,27 @@ impl JdApi {
         Ok(attach(packages, links))
     }
 
-    pub fn snapshot(&mut self) -> Result<Snapshot> {
+    /// The slow-changing part of a snapshot: four round trips that need
+    /// not run on every refresh.
+    pub fn status(&mut self) -> Result<Status> {
+        Ok(Status {
+            stop_mark: self.stop_mark()?,
+            collecting: self.is_collecting()?,
+            extracting: self.extraction_queue()?,
+            captchas: self.captchas()?,
+        })
+    }
+
+    /// The lists and the controller state, four round trips, around a
+    /// `status` fetched earlier.
+    pub fn snapshot(&mut self, status: Status) -> Result<Snapshot> {
         Ok(Snapshot {
             state: self.state()?,
             speed: self.speed()?,
-            stop_mark: self.stop_mark()?,
-            collecting: self.is_collecting()?,
+            stop_mark: status.stop_mark,
+            collecting: status.collecting,
+            extracting: status.extracting,
+            captchas: status.captchas,
             downloads: self.downloads()?,
             grabber: self.grabber()?,
         })
