@@ -31,6 +31,81 @@ again unless they stop working. If the account has more than one JDownloader,
 you pick one; the choice is remembered. Press `d` at any time to switch to
 another one, or start with `jdtui --choose-device`.
 
+## The interface
+
+The header shows the state of the download controller (running, paused,
+stopped), the total speed as JDownloader reports it, how much is loaded and
+left, and anything that is waiting on you: captchas to solve, archives being
+extracted. `s` starts and stops the downloads, `P` pauses and resumes them.
+
+The footer lists the frequent keys; `?` opens the full reference.
+
+![The key reference](docs/help.png)
+
+### Acting on packages and links
+
+`Space` marks rows, `a` marks them all, `Enter` opens the context menu on the
+selection. Every entry acts on all marked rows at once, so a dozen links can be
+forced, resumed, reset, disabled, moved or removed in a single action.
+Destructive entries ask for confirmation first.
+
+![Acting on several links at once](docs/context-menu.png)
+
+What the menu offers, depending on the tab and the selection:
+
+- **Force download**, **Resume**, **Unskip**, **Reset**, **Enable / Disable**
+- **Set priority…**, from highest to lowest
+
+  ![Choosing a priority](docs/priority.png)
+
+- **Rename…** a package or a link, **Set download folder…** for packages
+- **Move to new package…**, **Split by hoster**
+- **Copy urls**: shows the urls of the selection and puts them on the
+  clipboard, through the terminal (OSC 52), so it also works over SSH
+- **Check availability**, **Extract now**, **Delete finished links**
+- **Stop after this**: the download list stops once this row is done; `t` does
+  the same without opening the menu, and again on the same row clears it
+- **Remove**, **Move to download list** on the Link Grabber tab
+
+Removing from the **Downloads** tab asks what should happen to the files already
+on disk, the same three choices the desktop GUI offers: leave them, move them to
+the recycle bin, or delete them. The two that touch data ask again before
+running.
+
+![Choosing what happens to the files](docs/remove.png)
+
+### Adding links
+
+`n` opens the same form as the GUI's add dialog: urls, package name, destination
+folder, extract and download passwords, priority and autostart. Pasting a list
+of urls works; newlines become separators.
+
+![Adding links](docs/add-links.png)
+
+The **Link Grabber** tab shows what is waiting to be confirmed, with the
+availability and hoster of every link, and says so while JDownloader is still
+crawling what you added. `c` moves the whole list to the downloads, `C` clears
+it, `x` aborts the crawling. `e` adds a password to the list JDownloader tries
+on every archive.
+
+![The link grabber](docs/link-grabber.png)
+
+### Accounts
+
+`A` lists the premium accounts of the JDownloader with their traffic and
+expiry, and lets you enable, disable or refresh them.
+
+![The accounts panel](docs/accounts.png)
+
+### The JDownloader itself
+
+`D` opens a menu on the JDownloader you are connected to: check for updates,
+restart, reconnect for a new IP, exit. Installing an update is offered only
+when JDownloader reports one. Nothing that touches the host machine (shutdown,
+standby) is there.
+
+![The device menu](docs/device.png)
+
 ## Keys
 
 | Key | Action |
@@ -47,53 +122,16 @@ another one, or start with `jdtui --choose-device`.
 | `t` | Stop downloads after the row under the cursor; again to clear |
 | `y` | Show the urls of the selection and copy them to the clipboard |
 | `e` | Add a password to the list tried on every archive |
-| `s` | Start / stop downloads |
-| `P` | Pause / resume downloads |
-| `A` | Premium accounts: enable, disable, refresh |
-| `D` | The JDownloader itself: check for updates, update and restart, restart, reconnect, exit |
-| `d` | Switch to another JDownloader of the account |
 | `c` | Move the whole Link Grabber to the download list |
 | `C` | Clear the Link Grabber |
 | `x` | Abort link crawling |
+| `s` | Start / stop downloads |
+| `P` | Pause / resume downloads |
+| `A` | Premium accounts: enable, disable, refresh |
+| `D` | The JDownloader itself: updates, restart, reconnect, exit |
+| `d` | Switch to another JDownloader of the account |
 | `?` | Show every key |
 | `q` | Quit |
-
-The footer shows the frequent keys; `?` opens the full list.
-
-![The key reference](docs/help.png)
-
-The context menu acts on every marked row at once, so a dozen links can be
-forced, reset, disabled or removed in a single action. Destructive entries ask
-for confirmation first.
-
-![Acting on several links at once](docs/context-menu.png)
-
-The same menu changes the priority of the selection:
-
-![Choosing a priority](docs/priority.png)
-
-Removing from the **Downloads** tab asks what should happen to the files already
-on disk, the same three choices the desktop GUI offers: leave them, move them to
-the recycle bin, or delete them. The two that touch data ask again before
-running.
-
-![Choosing what happens to the files](docs/remove.png)
-
-`n` opens the same form as the GUI's add dialog: urls, package name, destination
-folder, extract and download passwords, priority and autostart. Pasting a list
-of urls works; newlines become separators.
-
-![Adding links](docs/add-links.png)
-
-`A` lists the premium accounts of the JDownloader with their traffic and
-expiry, and lets you enable, disable or refresh them:
-
-![The accounts panel](docs/accounts.png)
-
-The **Link Grabber** tab shows what is waiting to be confirmed, with the
-availability and hoster of every link:
-
-![The link grabber](docs/link-grabber.png)
 
 ## Config
 
@@ -116,7 +154,10 @@ tokens. The unit tests pin the key derivation, signature and cipher output
 against the reference Python client, byte for byte.
 
 Refreshes run on a background thread so the interface never waits on the
-network; actions you trigger are sent immediately and force an early refresh.
+network. A refresh is four round trips through the relay (state, speed, the two
+lists); what changes rarely (stop mark, crawling, extraction queue, captchas) is
+fetched every fifth refresh and right after an action. Actions you trigger are
+sent immediately and force an early refresh.
 
 ## Screenshots
 
@@ -124,6 +165,10 @@ The images above are generated, not captured: `cargo run --example screenshots`
 draws the real interface into a test buffer and writes `docs/*.svg`, converting
 each to a PNG for this page. They cannot drift from the code, and the data in
 them is invented.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Credits
 

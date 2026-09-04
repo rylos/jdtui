@@ -377,6 +377,13 @@ fn main() {
     app.mode = Mode::Accounts;
     shot("accounts", &app);
 
+    // The JDownloader itself, with an update pending.
+    let mut app = base();
+    app.menu = jdtui::model::device_menu(true);
+    app.menu_index = 1;
+    app.mode = Mode::DeviceMenu;
+    shot("device", &app);
+
     // The key reference.
     let mut app = base();
     app.mode = Mode::Help;
