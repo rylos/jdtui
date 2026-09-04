@@ -111,6 +111,19 @@ pub struct Snapshot {
     pub grabber: Vec<Package>,
 }
 
+impl Snapshot {
+    /// The download controller is active, paused or not. States are those
+    /// of JDownloader's DownloadWatchDog: IDLE, RUNNING, PAUSE, STOPPING,
+    /// STOPPED_STATE.
+    pub fn is_running(&self) -> bool {
+        matches!(self.state.as_str(), "RUNNING" | "PAUSE")
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.state == "PAUSE"
+    }
+}
+
 /// What to do with the files of a package being removed, mirroring the
 /// three choices the desktop GUI offers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -271,6 +284,12 @@ impl JdApi {
         self.call_unit("/downloadcontroller/stop", &[])
     }
 
+    /// Pause (`true`) or resume (`false`). JDownloader only pauses from
+    /// RUNNING; anywhere else the call is silently ignored.
+    pub fn pause(&mut self, value: bool) -> Result<()> {
+        self.call_unit("/downloadcontroller/pause", &[json!(value)])
+    }
+
     pub fn set_enabled(&mut self, enable: bool, links: &[i64], packages: &[i64], grabber: bool) -> Result<()> {
         let path = if grabber { "/linkgrabberv2/setEnabled" } else { "/downloadsV2/setEnabled" };
         self.call_unit(path, &[json!(enable), json!(links), json!(packages)])
@@ -413,5 +432,31 @@ mod live {
 
         // Nothing of ours must be left behind in either list.
         assert!(api.grabber().unwrap().iter().all(|p| p.name != NAME));
+    }
+
+    /// Pause and resume, leaving the controller as it was found. From
+    /// anything but RUNNING the device ignores the pause, so the test only
+    /// asserts a transition when there was something to pause.
+    #[test]
+    #[ignore]
+    fn pause_is_accepted_and_reversible() {
+        let mut api = api();
+        let before = api.state().expect("state");
+        println!("state before: {before}");
+
+        api.pause(true).expect("pause");
+        let paused = wait_for("the state to settle", || {
+            let s = api.state().ok()?;
+            (before != "RUNNING" || s == "PAUSE").then_some(s)
+        });
+        println!("state after pause: {paused}");
+
+        api.pause(false).expect("resume");
+        let after = wait_for("the state to come back", || {
+            let s = api.state().ok()?;
+            (s != "PAUSE").then_some(s)
+        });
+        println!("state after resume: {after}");
+        assert_eq!(after, before);
     }
 }

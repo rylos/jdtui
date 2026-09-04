@@ -71,7 +71,14 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
             ("c", "Move the whole Link Grabber to downloads"),
         ],
     ),
-    ("JDownloader", &[("s", "Start / stop downloads"), ("d", "Switch to another JDownloader of the account")]),
+    (
+        "JDownloader",
+        &[
+            ("s", "Start / stop downloads"),
+            ("P", "Pause / resume downloads"),
+            ("d", "Switch to another JDownloader of the account"),
+        ],
+    ),
     ("Program", &[("?  h", "This help"), ("q  Ctrl-C", "Quit")]),
 ];
 
@@ -407,11 +414,19 @@ impl App {
     }
 
     fn toggle_downloads(&mut self) {
-        let running = matches!(self.snapshot.state.as_str(), "RUNNING" | "DOWNLOADING");
-        let outcome = if running {
+        let outcome = if self.snapshot.is_running() {
             self.with_api(|a| a.stop()).map(|_| "Downloads stopped".to_string())
         } else {
             self.with_api(|a| a.start()).map(|_| "Downloads started".to_string())
+        };
+        self.finish(outcome);
+    }
+
+    fn toggle_pause(&mut self) {
+        let outcome = match self.snapshot.state.as_str() {
+            "RUNNING" => self.with_api(|a| a.pause(true)).map(|_| "Downloads paused".to_string()),
+            "PAUSE" => self.with_api(|a| a.pause(false)).map(|_| "Downloads resumed".to_string()),
+            _ => Err("downloads are not running".to_string()),
         };
         self.finish(outcome);
     }
@@ -603,6 +618,7 @@ impl App {
                 self.mode = Mode::Add;
             }
             Key::Char('s') => self.toggle_downloads(),
+            Key::Char('P') => self.toggle_pause(),
             Key::Char('d') => self.choose_device(),
             Key::Char('?' | 'h') => self.mode = Mode::Help,
             Key::Char('c') if self.tab.is_grabber() => {
