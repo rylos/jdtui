@@ -356,6 +356,24 @@ fn main() {
     app.mode = Mode::Add;
     shot("add-links", &app);
 
+    // Picking a download folder for the add form.
+    let mut app = base();
+    let mut form = Form::add_links();
+    form.type_str("https://mirror.example.org/debian-13.iso");
+    form.next();
+    form.next();
+    app.form = Some(form);
+    app.folders = vec![
+        "/downloads".into(),
+        "/downloads/<jd:packagename>".into(),
+        "/downloads/Debian 13".into(),
+        "/downloads/Ubuntu 24.04.1".into(),
+        "/media/archive".into(),
+    ];
+    app.folder_index = 1;
+    app.mode = Mode::FolderChoice;
+    shot("folders", &app);
+
     // The Link Grabber tab.
     let mut app = base();
     app.tab = Tab::Grabber;

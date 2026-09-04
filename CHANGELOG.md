@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `Ctrl-F` on a "Save to" field picks from the folders JDownloader used
+  lately, the folders of the packages in the lists and the mount points.
 - The form cursor no longer takes a cell of its own: the char under it is
   drawn in reverse, so the text does not shift while typing.
 - Copy urls also goes through `wl-copy`, `xclip` or `xsel` when a display is

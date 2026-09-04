@@ -80,7 +80,13 @@ running.
 
 `n` opens the same form as the GUI's add dialog: urls, package name, destination
 folder, extract and download passwords, priority and autostart. Pasting a list
-of urls works; newlines become separators.
+of urls works; newlines become separators. On the folder field, `Ctrl-F` lists
+the folders JDownloader used lately (the same list as the GUI's combo,
+`<jd:packagename>` placeholders included), the folders of the packages in the
+lists and the mount points; pick one and edit it. The same picker serves the
+download-folder and new-package forms.
+
+![Picking a download folder](docs/folders.png)
 
 ![Adding links](docs/add-links.png)
 

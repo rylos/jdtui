@@ -53,6 +53,9 @@ pub enum Mode {
     ArchivePassword,
     /// Typing the list filter, in `form`; the list follows every key.
     Filter,
+    /// Picking a download folder for the "Save to" field of the form the
+    /// picker was opened from, which `folder_return` names.
+    FolderChoice,
     /// The full key reference; the footer only shows the frequent ones.
     Help,
     /// The urls of the selection, in `urls`.
@@ -133,6 +136,8 @@ pub enum Key {
     Delete,
     /// Ctrl-U: clear the text field.
     CtrlU,
+    /// Ctrl-F: the folder picker, on a "Save to" field.
+    CtrlF,
 }
 
 pub struct App {
@@ -164,6 +169,11 @@ pub struct App {
     /// Variants of the link under the cursor, for `Mode::VariantChoice`.
     pub variants: Vec<LinkVariant>,
     pub variant_index: usize,
+    /// Folders offered by `Mode::FolderChoice`, and the form mode to go
+    /// back to.
+    pub folders: Vec<String>,
+    pub folder_index: usize,
+    folder_return: Mode,
     pub form: Option<Form>,
 
     /// Urls shown by `Mode::Urls`.
@@ -208,6 +218,9 @@ impl App {
             priority_index: 0,
             variants: Vec::new(),
             variant_index: 0,
+            folders: Vec::new(),
+            folder_index: 0,
+            folder_return: Mode::List,
             form: None,
             urls: Vec::new(),
             accounts: Vec::new(),
@@ -251,6 +264,9 @@ impl App {
             priority_index: 0,
             variants: Vec::new(),
             variant_index: 0,
+            folders: Vec::new(),
+            folder_index: 0,
+            folder_return: Mode::List,
             form: None,
             urls: Vec::new(),
             accounts: Vec::new(),
@@ -967,6 +983,7 @@ impl App {
                     self.handle_form_key(key)
                 }
                 Mode::Filter => self.handle_filter_key(key),
+                Mode::FolderChoice => self.handle_folder_key(key),
                 Mode::Help => {
                     if matches!(key, Key::Esc | Key::Enter | Key::Char('q' | '?' | 'h')) {
                         self.mode = Mode::List;
@@ -1215,6 +1232,62 @@ impl App {
         }
     }
 
+    /// Folders worth offering for a "Save to" field: the history JDownloader
+    /// keeps (placeholders included), the folders of the packages in both
+    /// lists, and the mount points. One round trip for the history, one
+    /// for the mounts; both optional.
+    fn open_folders(&mut self) {
+        let Some(form) = &self.form else { return };
+        if form.active_label() != "Save to" {
+            return;
+        }
+        let current = form.value("Save to").trim().to_string();
+        let mut folders: Vec<String> = Vec::new();
+        let mut push = |f: String| {
+            let f = f.trim().to_string();
+            if !f.is_empty() && !folders.contains(&f) {
+                folders.push(f);
+            }
+        };
+        if let Ok(history) = self.with_api(|a| a.folder_history()) {
+            history.into_iter().for_each(&mut push);
+        }
+        self.snapshot
+            .downloads
+            .iter()
+            .chain(&self.snapshot.grabber)
+            .filter_map(|p| p.save_to.clone())
+            .for_each(&mut push);
+        if let Ok(roots) = self.with_api(|a| a.storage_roots()) {
+            roots.into_iter().filter_map(|r| r.path).for_each(&mut push);
+        }
+        if folders.is_empty() {
+            self.message = Some(("JDownloader reports no folders".into(), true));
+            return;
+        }
+        self.folder_index = folders.iter().position(|f| *f == current).unwrap_or(0);
+        self.folders = folders;
+        self.folder_return = self.mode;
+        self.mode = Mode::FolderChoice;
+    }
+
+    fn handle_folder_key(&mut self, key: Key) {
+        match key {
+            Key::Esc | Key::Left | Key::Char('q') => self.mode = self.folder_return,
+            Key::Up | Key::Char('k') => self.folder_index = self.folder_index.saturating_sub(1),
+            Key::Down | Key::Char('j') => {
+                self.folder_index = (self.folder_index + 1).min(self.folders.len().saturating_sub(1))
+            }
+            Key::Enter | Key::Right | Key::Char(' ') => {
+                if let (Some(folder), Some(form)) = (self.folders.get(self.folder_index).cloned(), &mut self.form) {
+                    form.set_value("Save to", &folder);
+                }
+                self.mode = self.folder_return;
+            }
+            _ => {}
+        }
+    }
+
     /// Keys of the popup forms: add links, rename, download folder.
     fn handle_form_key(&mut self, key: Key) {
         match key {
@@ -1223,6 +1296,7 @@ impl App {
                 self.mode = Mode::List;
                 self.message = Some(("Cancelled".into(), false));
             }
+            Key::CtrlF => self.open_folders(),
             Key::Enter => match self.mode {
                 Mode::Rename => self.submit_rename(),
                 Mode::Directory => self.submit_directory(),

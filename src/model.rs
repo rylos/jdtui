@@ -480,6 +480,19 @@ impl Form {
         self.fields.iter().find(|f| f.label == label).map(|f| f.text.as_str()).unwrap_or("")
     }
 
+    /// Replace the text of a field, cursor at the end.
+    pub fn set_value(&mut self, label: &str, text: &str) {
+        if let Some(f) = self.fields.iter_mut().find(|f| f.label == label) {
+            f.text = text.to_string();
+            f.cursor = f.text.chars().count();
+        }
+    }
+
+    /// Label of the active field.
+    pub fn active_label(&self) -> &'static str {
+        self.fields[self.index].label
+    }
+
     pub fn flag(&self, label: &str) -> bool {
         self.fields.iter().find(|f| f.label == label).map(|f| f.flag).unwrap_or(false)
     }
