@@ -25,6 +25,10 @@ struct Args {
     #[arg(long)]
     choose_device: bool,
 
+    /// Do not listen to JDownloader's event channel; poll only.
+    #[arg(long)]
+    no_events: bool,
+
     /// Print the config file location and exit.
     #[arg(long)]
     config_path: bool,
@@ -43,6 +47,9 @@ fn main() -> Result<()> {
     }
     if args.choose_device {
         config.device = None;
+    }
+    if args.no_events {
+        config.events = Some(false);
     }
 
     let mut terminal = ratatui::init();

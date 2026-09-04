@@ -11,7 +11,7 @@ use crate::model::{
     device_menu, packages_of, row_key, row_name, row_priority, row_stop_marked, stop_mark_target,
 };
 use crate::myjd::{Device, MyJd};
-use crate::poller::{Poller, Update};
+use crate::poller::{EventSource, Poller, Update};
 
 /// Offered in the order the GUI lists them: safest first.
 pub const REMOVE_MODES: [RemoveMode; 3] = [RemoveMode::ListOnly, RemoveMode::Recycle, RemoveMode::DeleteFiles];
@@ -179,6 +179,9 @@ pub struct App {
     pub message: Option<(String, bool)>,
     /// Last refresh failure, shown in the header until a refresh succeeds.
     pub refresh_error: Option<String>,
+    /// The event channel is up: changes show at once, and the refresh slows
+    /// down while nothing downloads.
+    pub events_live: bool,
 }
 
 impl App {
@@ -212,6 +215,7 @@ impl App {
             clipboard: None,
             message: None,
             refresh_error: None,
+            events_live: false,
         };
         if app.config.has_credentials() {
             let email = app.config.email.clone().unwrap_or_default();
@@ -254,6 +258,7 @@ impl App {
             clipboard: None,
             message: None,
             refresh_error: None,
+            events_live: false,
         };
         app.rebuild_rows();
         app
@@ -317,7 +322,7 @@ impl App {
         if let Some(api) = &self.api {
             // Switching from the main screen: keep the session, swap the target.
             if let Ok(mut a) = api.lock() {
-                a.set_device(device.id);
+                a.set_device(device.id.clone());
             }
             self.snapshot = Snapshot::default();
             self.rows.clear();
@@ -326,6 +331,7 @@ impl App {
             self.marked.clear();
             self.mode = Mode::List;
             if let Some(p) = &self.poller {
+                p.set_device(device.id);
                 p.refresh_now();
             }
             self.screen = Screen::Main;
@@ -333,8 +339,13 @@ impl App {
         }
 
         let Some(myjd) = self.myjd.take() else { return };
+        let events = self.config.events().then(|| EventSource {
+            email: self.config.email.clone().unwrap_or_default(),
+            password: self.config.password.clone().unwrap_or_default(),
+            device_id: device.id.clone(),
+        });
         let api = Arc::new(Mutex::new(JdApi::new(myjd, device.id)));
-        self.poller = Some(Poller::start(api.clone(), Duration::from_millis(self.config.refresh_ms())));
+        self.poller = Some(Poller::start(api.clone(), Duration::from_millis(self.config.refresh_ms()), events));
         self.api = Some(api);
         self.screen = Screen::Main;
     }
@@ -358,7 +369,10 @@ impl App {
         let Some(poller) = &self.poller else { return };
         let mut latest = None;
         while let Some(update) = poller.try_recv() {
-            latest = Some(update);
+            match update {
+                Update::Events(live) => self.events_live = live,
+                other => latest = Some(other),
+            }
         }
         match latest {
             Some(Update::Snapshot(s)) => {
@@ -367,7 +381,7 @@ impl App {
                 self.rebuild_rows();
             }
             Some(Update::Error(e)) => self.refresh_error = Some(e),
-            None => {}
+            Some(Update::Events(_)) | None => {}
         }
     }
 

@@ -190,6 +190,19 @@ impl MyJd {
         path: &str,
         params: &[serde_json::Value],
     ) -> Result<T> {
+        self.device_call_with_timeout(device_id, path, params, None)
+    }
+
+    /// A device call that may legitimately take longer than the agent's
+    /// default, such as `/events/listen`, which blocks until an event comes
+    /// or its poll timeout runs out.
+    pub fn device_call_with_timeout<T: DeserializeOwned>(
+        &mut self,
+        device_id: &str,
+        path: &str,
+        params: &[serde_json::Value],
+        timeout: Option<Duration>,
+    ) -> Result<T> {
         let (session_token, device_key) = match &self.session {
             Some(s) => (s.session_token.clone(), s.device_key),
             None => return Err(Error::NotConnected),
@@ -204,14 +217,12 @@ impl MyJd {
         let encrypted = encrypt(&device_key, body.to_string().as_bytes());
         let url = format!("{API_URL}/t_{session_token}_{device_id}{path}");
 
-        let response = self
-            .agent
-            .post(&url)
-            .header("Content-Type", CONTENT_TYPE)
-            .config()
-            .http_status_as_error(false)
-            .build()
-            .send(encrypted.as_bytes())?;
+        let mut request =
+            self.agent.post(&url).header("Content-Type", CONTENT_TYPE).config().http_status_as_error(false);
+        if let Some(t) = timeout {
+            request = request.timeout_global(Some(t));
+        }
+        let response = request.build().send(encrypted.as_bytes())?;
         let status = response.status().as_u16();
         let text = response.into_body().read_to_string()?;
         if status != 200 {

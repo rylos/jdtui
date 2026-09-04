@@ -10,6 +10,11 @@
   it.
 - Link Grabber links that come in several variants (video qualities, audio
   only) show the chosen one, and the context menu switches it.
+- jdtui listens to JDownloader's event channel: changes made elsewhere show
+  up within a second or two, and while nothing downloads the periodic
+  refresh slows to thirty seconds. `events = false` in the config or
+  `--no-events` turns it off. The header says `live` while the channel is
+  up.
 
 ## 1.1.1 — 2026-09-04
 

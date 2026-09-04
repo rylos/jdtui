@@ -147,6 +147,8 @@ password = "…"
 device = "…"
 # refresh period in milliseconds (default 1000)
 refresh_ms = 1000
+# listen to JDownloader's event channel (default true); --no-events for one run
+events = true
 ```
 
 ## How it talks to JDownloader
@@ -161,6 +163,16 @@ network. A refresh is four round trips through the relay (state, speed, the two
 lists); what changes rarely (stop mark, crawling, extraction queue, captchas) is
 fetched every fifth refresh and right after an action. Actions you trigger are
 sent immediately and force an early refresh.
+
+A second thread subscribes to JDownloader's event channel (`/events`) with a
+session of its own and long-polls it. Anything that changes the lists, the
+controller state, the captchas or the extraction queue wakes the refresh at
+once, so a link added from the browser or another client shows up within a
+second or two. While the channel is up and nothing is downloading, the
+periodic refresh stretches to thirty seconds: the events cover the changes,
+and the relay sees a fraction of the calls. The header says `live` while the
+channel is up; if it drops, polling carries on at the configured period and
+the channel is reopened every ten seconds.
 
 ## Screenshots
 
