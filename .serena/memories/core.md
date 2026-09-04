@@ -9,7 +9,7 @@ Rust TUI for JDownloader 2 over the My.JDownloader relay API. Single crate: lib 
 - `model.rs` — view model: `Tab`, `Row`/`RowKey`, `build_rows`, `Action` enum, `context_menu(tab, packages, rows, stop_mark)`, `Form`/`Field` constructors (login, add_links, rename, directory, new_package, archive_password), `PRIORITIES`, `stop_mark_target`/`row_stop_marked`.
 - `api.rs` — `JdApi` device calls; data types `Package`, `Link`, `Snapshot`, `Status`, `RemoveMode`, `AddLinks`, `ArchiveStatus`, `CaptchaJob`, `Account`. `status()` = slow part (stop mark, collecting, extraction queue, captchas); `snapshot(status)` = state, speed, downloads, grabber (4 round trips, ~110 ms each via relay).
 - `myjd.rs` — native My.JDownloader protocol + crypto; own `Error` with `is_auth_failure`/`is_session_expired`.
-- `poller.rs` — background thread; fetches `status()` every `STATUS_EVERY` (5) refreshes or right after `refresh_now()` (called after every successful action), `snapshot()` every refresh.
+- `poller.rs` — refresh thread: `status()` every `STATUS_EVERY` (5) refreshes or after a wake, `snapshot()` every refresh. Listener thread (`listen`): own `MyJd` session (listen blocks 25 s), `subscribe_events` with `JdApi::EVENT_SUBSCRIPTIONS` regexes, any event → wake (debounced by `WAKE_GAP` 500 ms, NOT period-relative). With the channel up and state not running the period stretches to `IDLE_PERIOD` (30 s). `Update::Events(bool)` → `App.events_live` ("· live" in header). `Poller::set_device` resubscribes (takes up to one poll timeout to notice). Off with config `events = false` / `--no-events`.
 - `config.rs` — `~/.config/jdtui/config.toml`, mode 0600.
 
 ## Other dirs

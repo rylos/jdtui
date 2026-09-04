@@ -9,6 +9,6 @@
 - New API endpoint: method on `JdApi` in api.rs, then a `#[ignore]` live test in `api::live` that creates/uses a throwaway `jdtui-*` grabber package and removes it; run it once against the real device before building UI on it.
 - Screenshots: any UI/key change → `cargo run --example screenshots` (regenerates all PNG/SVG; commit them). New panels get a shot + README paragraph.
 - Errors: protocol layer returns `myjd::Result`; UI strings via `api::describe_error`; shown in footer `message: Option<(String, bool)>` (bool = is_error) or header `refresh_error`.
-- Tests: inline `mod tests` (offline, byte-exact crypto fixtures) and `mod live` (`#[ignore]`, real service).
+- Tests: inline `mod tests` (offline: crypto fixtures, form editing, row filtering) and `mod live` (`#[ignore]`, real service) in api.rs, myjd.rs and poller.rs. Live helpers: `wait_for` (15 s), `wait_for_long` (2 min, for crawls). A failed live test leaves `jdtui-*` packages on the device: remove them before rerunning or the counts are off.
 - Commit messages: imperative English sentence, no prefix/scope; body only when a non-obvious decision needs explaining.
 - Never commit real credentials/device names; screenshot data is invented on purpose.
