@@ -1,6 +1,6 @@
 # Release procedure (as done for 1.0.0 and 1.1.0)
 
-1. Bump `version` in Cargo.toml (Cargo.lock follows on build); add a section to CHANGELOG.md; rework README if features changed; `cargo run --example screenshots`.
+1. Bump `version` in Cargo.toml (Cargo.lock follows on build); rename the CHANGELOG.md "Unreleased" section to "X.Y.Z — date" (unreleased changes are collected there between releases); rework README if features changed; `cargo run --example screenshots`.
 2. Commit "Release X.Y.Z"; annotated tag `vX.Y.Z` whose message is the release notes (first line "jdtui X.Y.Z").
 3. `git push origin main --follow-tags`.
 4. GitHub release: `gh release create vX.Y.Z --title "jdtui X.Y.Z" --notes-file <notes>`.

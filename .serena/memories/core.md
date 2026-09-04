@@ -20,7 +20,8 @@ Rust TUI for JDownloader 2 over the My.JDownloader relay API. Single crate: lib 
 - Network only in `myjd.rs`/`api.rs`/`poller.rs`; `ui.rs` and `model.rs` never touch it. Keep ui a function of `&App`.
 - Destructive actions (`MenuEntry.confirm`, `RemoveMode::touches_files`, `Action::ClearGrabber`) go through `Mode::Confirm` / `Mode::RemoveChoice` first.
 - Actions: `run_action` → `with_api` → `finish` (message, clears marks, `refresh_now`). Actions that are not selection actions (stop mark, archive password) save/restore `marked` around `finish`.
-- Popup forms all share `self.form` + `handle_form_key`, dispatching on `Mode` at Enter.
+- Popup forms all share `self.form` + `handle_form_key`, dispatching on `Mode` at Enter. `Field` text fields keep a char-index `cursor` (insert/backspace/delete/clear are `Field` methods; `Form::cycle` moves it on text fields, cycles choices/flips flags otherwise). Prefill with `Field::with_text` so the cursor lands at the end.
+- Keys reach the app only through `Key` (app.rs) translated in `main.rs::translate`; a new physical key (Home, Delete, Ctrl-x…) needs a `Key` variant plus a `translate` arm.
 - API quirks worth remembering are in `mem:api_quirks`.
 
 See `mem:tech_stack`, `mem:conventions`, `mem:suggested_commands` (incl. live tests), `mem:task_completion`.
