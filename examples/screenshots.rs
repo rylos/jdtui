@@ -263,6 +263,7 @@ fn demo() -> Snapshot {
     Snapshot {
         state: "RUNNING".into(),
         speed: 11 * 1024 * 1024,
+        stop_mark: Some(207),
         downloads: vec![finished, running, queued],
         grabber: vec![grabbed],
     }
@@ -296,7 +297,7 @@ fn main() {
         app.marked.insert(jdtui::model::row_key(&app.snapshot.downloads, &app.rows[row]));
     }
     let targets = app.target_rows();
-    app.menu = context_menu(Tab::Downloads, &app.snapshot.downloads, &targets);
+    app.menu = context_menu(Tab::Downloads, &app.snapshot.downloads, &targets, None);
     app.menu_index = 0;
     app.mode = Mode::Menu;
     shot("context-menu", &app);

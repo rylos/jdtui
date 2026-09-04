@@ -88,6 +88,26 @@ pub fn row_priority<'a>(packages: &'a [Package], row: &Row) -> Option<&'a str> {
     }
 }
 
+/// The link the stop mark goes on for this row: the link itself, or the
+/// last link of a package, which is as close as the API gets to "after
+/// this package".
+pub fn stop_mark_target(packages: &[Package], row: &Row) -> Option<i64> {
+    match row.link {
+        None => packages[row.package].links.last().map(|l| l.uuid),
+        Some(l) => Some(packages[row.package].links[l].uuid),
+    }
+}
+
+/// Whether the stop mark sits on this row: on the link, or on any link
+/// of the package.
+pub fn row_stop_marked(packages: &[Package], row: &Row, stop_mark: Option<i64>) -> bool {
+    let Some(mark) = stop_mark else { return false };
+    match row.link {
+        None => packages[row.package].links.iter().any(|l| l.uuid == mark),
+        Some(l) => packages[row.package].links[l].uuid == mark,
+    }
+}
+
 pub fn row_enabled(packages: &[Package], row: &Row) -> bool {
     match row.link {
         None => packages[row.package].is_enabled(),
@@ -144,6 +164,8 @@ pub enum Action {
     Priority,
     /// Apply a priority, one of `PRIORITIES`.
     PriorityTo(&'static str),
+    /// Set or clear the stop mark on the row; one row only, downloads tab.
+    ToggleStopMark,
     /// Open the rename form; one row only.
     Rename,
     /// Open the download folder form; packages only.
@@ -163,7 +185,7 @@ fn entry(label: impl Into<String>, action: Action, confirm: bool) -> MenuEntry {
 }
 
 /// The actions the API supports for this selection.
-pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row]) -> Vec<MenuEntry> {
+pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row], stop_mark: Option<i64>) -> Vec<MenuEntry> {
     let single = rows.len() == 1;
     let any_enabled = rows.iter().any(|r| row_enabled(packages, r));
     let suffix = if single { "" } else { " all" };
@@ -200,6 +222,10 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row]) -> Vec<MenuEnt
     }
     if rows.iter().all(|r| r.is_package()) {
         insert(entry("Set download folder…", Action::Directory, false));
+    }
+    if single && !tab.is_grabber() {
+        let marked = row_stop_marked(packages, &rows[0], stop_mark);
+        insert(entry(if marked { "Remove stop mark" } else { "Stop after this" }, Action::ToggleStopMark, false));
     }
 
     if single && rows[0].is_package() {
