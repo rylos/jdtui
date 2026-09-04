@@ -291,14 +291,14 @@ fn main() {
     // The tree, with one package opened.
     let mut app = base();
     app.expanded.insert(2);
-    app.rows = build_rows(&app.snapshot.downloads, &app.expanded);
+    app.rows = build_rows(&app.snapshot.downloads, &app.expanded, "");
     app.cursor = 1;
     shot("downloads", &app);
 
     // A selection of links, with the menu open on all of them.
     let mut app = base();
     app.expanded.insert(2);
-    app.rows = build_rows(&app.snapshot.downloads, &app.expanded);
+    app.rows = build_rows(&app.snapshot.downloads, &app.expanded, "");
     app.cursor = 5;
     for row in [2usize, 3, 4] {
         app.marked.insert(jdtui::model::row_key(&app.snapshot.downloads, &app.rows[row]));
@@ -337,7 +337,7 @@ fn main() {
     let mut app = base();
     app.tab = Tab::Grabber;
     app.expanded.insert(4);
-    app.rows = build_rows(&app.snapshot.grabber, &app.expanded);
+    app.rows = build_rows(&app.snapshot.grabber, &app.expanded, "");
     shot("link-grabber", &app);
 
     // The accounts panel.
@@ -379,7 +379,7 @@ fn main() {
 
     // The JDownloader itself, with an update pending.
     let mut app = base();
-    app.menu = jdtui::model::device_menu(true);
+    app.menu = jdtui::model::device_menu(true, 0);
     app.menu_index = 1;
     app.mode = Mode::DeviceMenu;
     shot("device", &app);

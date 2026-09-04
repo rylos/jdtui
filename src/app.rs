@@ -49,6 +49,8 @@ pub enum Mode {
     NewPackage,
     /// Typing a password for the extraction password list, in `form`.
     ArchivePassword,
+    /// Typing the list filter, in `form`; the list follows every key.
+    Filter,
     /// The full key reference; the footer only shows the frequent ones.
     Help,
     /// The urls of the selection, in `urls`.
@@ -68,6 +70,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
             ("Tab", "Switch between Downloads and Link Grabber"),
             ("↑ ↓  k j", "Move the cursor"),
             ("→ ←", "Expand / collapse a package"),
+            ("/", "Filter rows by name, hoster or status"),
         ],
     ),
     (
@@ -103,7 +106,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
             ("s", "Start / stop downloads"),
             ("P", "Pause / resume downloads"),
             ("A", "Accounts: enable, disable, refresh"),
-            ("D", "Updates, restart, reconnect, exit"),
+            ("D", "Captchas, updates, restart, reconnect, exit"),
             ("d", "Switch to another JDownloader of the account"),
         ],
     ),
@@ -147,6 +150,8 @@ pub struct App {
     pub cursor: usize,
     pub expanded: HashSet<i64>,
     pub marked: HashSet<RowKey>,
+    /// Substring the rows are filtered by; empty shows everything.
+    pub filter: String,
 
     pub menu: Vec<MenuEntry>,
     pub menu_index: usize,
@@ -188,6 +193,7 @@ impl App {
             cursor: 0,
             expanded: HashSet::new(),
             marked: HashSet::new(),
+            filter: String::new(),
             menu: Vec::new(),
             menu_index: 0,
             remove_index: 0,
@@ -227,6 +233,7 @@ impl App {
             cursor: 0,
             expanded: HashSet::new(),
             marked: HashSet::new(),
+            filter: String::new(),
             menu: Vec::new(),
             menu_index: 0,
             remove_index: 0,
@@ -362,7 +369,7 @@ impl App {
     }
 
     fn rebuild_rows(&mut self) {
-        self.rows = build_rows(self.packages(), &self.expanded);
+        self.rows = build_rows(self.packages(), &self.expanded, &self.filter);
         self.cursor = self.cursor.min(self.rows.len().saturating_sub(1));
         // Drop marks on rows that no longer exist.
         let live: HashSet<RowKey> = self.rows.iter().map(|r| row_key(self.packages(), r)).collect();
@@ -511,6 +518,7 @@ impl App {
             | Action::NewPackage
             | Action::Urls
             | Action::CheckUpdate
+            | Action::SkipCaptchas
             | Action::UpdateAndRestart
             | Action::RestartJd
             | Action::ExitJd
@@ -523,7 +531,7 @@ impl App {
     /// only offers to install one that exists.
     fn open_device_menu(&mut self) {
         let update_available = self.with_api(|a| a.update_available()).unwrap_or(false);
-        self.menu = device_menu(update_available);
+        self.menu = device_menu(update_available, self.snapshot.captchas.len());
         self.menu_index = 0;
         self.mode = Mode::DeviceMenu;
     }
@@ -534,6 +542,15 @@ impl App {
                 a.run_update_check()?;
                 a.update_available()
             }),
+            Action::SkipCaptchas => {
+                let ids: Vec<i64> = self.snapshot.captchas.iter().map(|c| c.id).collect();
+                self.with_api(|a| {
+                    for id in &ids {
+                        a.skip_captcha(*id)?;
+                    }
+                    Ok(false)
+                })
+            }
             Action::UpdateAndRestart => self.with_api(|a| a.update_and_restart()).map(|_| false),
             Action::RestartJd => self.with_api(|a| a.restart_jd()).map(|_| false),
             Action::ExitJd => self.with_api(|a| a.exit_jd()).map(|_| false),
@@ -543,6 +560,7 @@ impl App {
         let outcome = outcome.map(|available| match action {
             Action::CheckUpdate if available => "An update is available".to_string(),
             Action::CheckUpdate => "JDownloader is up to date".to_string(),
+            Action::SkipCaptchas => "Captchas skipped".to_string(),
             Action::UpdateAndRestart => "JDownloader is updating and restarting".to_string(),
             Action::RestartJd => "JDownloader is restarting".to_string(),
             Action::ExitJd => "JDownloader is exiting".to_string(),
@@ -555,8 +573,8 @@ impl App {
         self.marked = marked;
         if found_update {
             // Reopen the menu on the entry that installs it.
-            self.menu = device_menu(true);
-            self.menu_index = 1;
+            self.menu = device_menu(true, self.snapshot.captchas.len());
+            self.menu_index = self.menu.iter().position(|e| e.action == Action::UpdateAndRestart).unwrap_or(0);
             self.mode = Mode::DeviceMenu;
         }
     }
@@ -873,6 +891,7 @@ impl App {
                 Mode::Add | Mode::Rename | Mode::Directory | Mode::NewPackage | Mode::ArchivePassword => {
                     self.handle_form_key(key)
                 }
+                Mode::Filter => self.handle_filter_key(key),
                 Mode::Help => {
                     if matches!(key, Key::Esc | Key::Enter | Key::Char('q' | '?' | 'h')) {
                         self.mode = Mode::List;
@@ -975,7 +994,19 @@ impl App {
                     self.marked.clear();
                 }
             }
-            Key::Esc => self.marked.clear(),
+            Key::Esc => {
+                // Marks first, then the filter, one Esc each.
+                if self.marked.is_empty() && !self.filter.is_empty() {
+                    self.filter.clear();
+                    self.rebuild_rows();
+                } else {
+                    self.marked.clear();
+                }
+            }
+            Key::Char('/') => {
+                self.form = Some(Form::filter(&self.filter));
+                self.mode = Mode::Filter;
+            }
             Key::Enter => {
                 let targets = self.target_rows();
                 if !targets.is_empty() {
@@ -1081,6 +1112,31 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// The filter form: every key applies to the list at once. Enter keeps
+    /// the filter, Esc drops it.
+    fn handle_filter_key(&mut self, key: Key) {
+        match key {
+            Key::Enter => {
+                self.form = None;
+                self.mode = Mode::List;
+            }
+            Key::Esc => {
+                self.form = None;
+                self.filter.clear();
+                self.rebuild_rows();
+                self.mode = Mode::List;
+            }
+            Key::Tab | Key::BackTab | Key::Up | Key::Down => {}
+            other => {
+                if let Some(form) = &mut self.form {
+                    form_edit(form, other);
+                    self.filter = form.value("Filter").to_string();
+                    self.rebuild_rows();
+                }
+            }
         }
     }
 
