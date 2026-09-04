@@ -50,6 +50,7 @@ another one, or start with `jdtui --choose-device`.
 | `s` | Start / stop downloads |
 | `P` | Pause / resume downloads |
 | `A` | Premium accounts: enable, disable, refresh |
+| `D` | The JDownloader itself: check for updates, update and restart, restart, reconnect, exit |
 | `d` | Switch to another JDownloader of the account |
 | `c` | Move the whole Link Grabber to the download list |
 | `C` | Clear the Link Grabber |

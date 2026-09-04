@@ -321,7 +321,7 @@ fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
     let side_width = match app.mode {
-        Mode::Menu => 34,
+        Mode::Menu | Mode::DeviceMenu => 34,
         Mode::RemoveChoice | Mode::Confirm(crate::model::Action::RemoveWith(_)) => 46,
         Mode::PriorityChoice => 34,
         Mode::Properties => 62,
@@ -373,7 +373,7 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
     draw_list(frame, app, list_area);
     if let Some(side) = side_area {
         match app.mode {
-            Mode::Menu => draw_menu(frame, app, side),
+            Mode::Menu | Mode::DeviceMenu => draw_menu(frame, app, side),
             Mode::RemoveChoice | Mode::Confirm(crate::model::Action::RemoveWith(_)) => {
                 draw_remove_choice(frame, app, side)
             }
@@ -666,8 +666,8 @@ fn draw_priority_choice(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_menu(frame: &mut Frame, app: &App, area: Rect) {
-    let targets = app.target_rows();
-    let block = panel(&describe(&targets), Some("Enter run · Esc close"));
+    let title = if app.mode == Mode::DeviceMenu { app.device_name.clone() } else { describe(&app.target_rows()) };
+    let block = panel(&title, Some("Enter run · Esc close"));
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let lines: Vec<Line> = app
