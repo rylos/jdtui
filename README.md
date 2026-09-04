@@ -45,6 +45,7 @@ another one, or start with `jdtui --choose-device`.
 | `p` | Properties of the selected row |
 | `n` | Add links to the Link Grabber |
 | `s` | Start / stop downloads |
+| `P` | Pause / resume downloads |
 | `d` | Switch to another JDownloader of the account |
 | `c` | Move the whole Link Grabber to the download list |
 | `?` | Show every key |

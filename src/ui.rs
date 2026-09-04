@@ -242,8 +242,10 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
     let (state_text, state_color) = match (&app.refresh_error, state) {
         (Some(e), _) => (format!("ERROR: {e}"), Color::Yellow),
         (None, "") => ("CONNECTING…".to_string(), Color::Yellow),
-        (None, "RUNNING" | "DOWNLOADING") => (state.to_string(), Color::Green),
-        (None, "STOPPED" | "STOPPED_STATE" | "IDLE") => (state.to_string(), Color::Red),
+        (None, "RUNNING") => (state.to_string(), Color::Green),
+        (None, "PAUSE") => ("PAUSED".to_string(), Color::Yellow),
+        (None, "STOPPED_STATE") => ("STOPPED".to_string(), Color::Red),
+        (None, "IDLE") => (state.to_string(), Color::Red),
         (None, other) => (other.to_string(), Color::Yellow),
     };
 
@@ -747,6 +749,9 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
                 sep(),
                 key("s"),
                 label(" start/stop"),
+                sep(),
+                key("P"),
+                label(if app.snapshot.is_paused() { " resume" } else { " pause" }),
                 sep(),
                 key("?"),
                 label(" help"),
