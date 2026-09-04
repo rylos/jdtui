@@ -89,6 +89,12 @@ fn copy_to_clipboard(text: &str) {
 fn translate(code: KeyCode, modifiers: KeyModifiers) -> Option<Key> {
     Some(match code {
         KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => Key::CtrlC,
+        KeyCode::Char('u') if modifiers.contains(KeyModifiers::CONTROL) => Key::CtrlU,
+        KeyCode::Char('a') if modifiers.contains(KeyModifiers::CONTROL) => Key::Home,
+        KeyCode::Char('e') if modifiers.contains(KeyModifiers::CONTROL) => Key::End,
+        KeyCode::Home => Key::Home,
+        KeyCode::End => Key::End,
+        KeyCode::Delete => Key::Delete,
         KeyCode::Char(c) => Key::Char(c),
         KeyCode::Enter => Key::Enter,
         KeyCode::Esc => Key::Esc,

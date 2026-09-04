@@ -123,6 +123,11 @@ pub enum Key {
     Right,
     Paste(String),
     CtrlC,
+    Home,
+    End,
+    Delete,
+    /// Ctrl-U: clear the text field.
+    CtrlU,
 }
 
 pub struct App {
@@ -1110,7 +1115,11 @@ fn form_edit(form: &mut Form, key: Key) {
         Key::BackTab | Key::Up => form.prev(),
         Key::Left => form.cycle(-1),
         Key::Right => form.cycle(1),
+        Key::Home => form.home(),
+        Key::End => form.end(),
         Key::Backspace => form.backspace(),
+        Key::Delete => form.delete(),
+        Key::CtrlU => form.clear(),
         Key::Char(c) => form.type_str(&c.to_string()),
         Key::Paste(text) => {
             // Newlines in a pasted list of urls become separators.

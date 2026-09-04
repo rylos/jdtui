@@ -208,7 +208,13 @@ fn form_lines(form: &Form) -> Vec<Line<'static>> {
             };
             if active {
                 if matches!(f.kind, FieldKind::Text | FieldKind::Secret) {
-                    value.content = format!("{}▏", value.content).into();
+                    // The cursor sits before the char at `f.cursor`.
+                    let shown: Vec<char> = value.content.chars().collect();
+                    let at = f.cursor.min(shown.len());
+                    let mut with_cursor: String = shown[..at].iter().collect();
+                    with_cursor.push('▏');
+                    with_cursor.extend(&shown[at..]);
+                    value.content = with_cursor.into();
                 }
                 value = value.style(selected_style());
             }
@@ -341,9 +347,9 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         let popup = centered(area, 90, form.fields.len() as u16 + 6);
         frame.render_widget(Clear, popup);
         let hint = match app.mode {
-            Mode::Add if form.is_valid() => "Enter add · Tab/↑↓ field · ←→ change · Esc cancel",
+            Mode::Add if form.is_valid() => "Enter add · Tab/↑↓ field · ←→ move / change · Esc cancel",
             Mode::Add => "Paste at least one url · Tab/↑↓ field · Esc cancel",
-            _ => "Enter apply · Esc cancel",
+            _ => "Enter apply · ←→ Home End move · Ctrl-U clear · Esc cancel",
         };
         let block = panel(form.title, Some(hint));
         let inner = block.inner(popup);

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Text fields have a cursor: `←` `→`, `Home`/`End` (or Ctrl-A/Ctrl-E),
+  `Delete`, and Ctrl-U to clear the field. Typing inserts at the cursor
+  instead of appending.
+
 ## 1.1.0 — 2026-09-04
 
 Everything the My.JDownloader API offers for day-to-day use is now reachable
