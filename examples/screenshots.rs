@@ -55,6 +55,24 @@ fn palette(color: Color, foreground: bool) -> Option<String> {
     Some(named.to_string())
 }
 
+/// Background of a cell as drawn, with REVERSED swapping the two colours
+/// the way a terminal does (the form cursor relies on it).
+fn effective_bg(cell: &ratatui::buffer::Cell) -> Option<String> {
+    if cell.modifier.contains(Modifier::REVERSED) {
+        Some(palette(cell.fg, true).unwrap_or_else(|| FG.into()))
+    } else {
+        palette(cell.bg, false)
+    }
+}
+
+fn effective_fg(cell: &ratatui::buffer::Cell) -> String {
+    if cell.modifier.contains(Modifier::REVERSED) {
+        palette(cell.bg, false).unwrap_or_else(|| BG.into())
+    } else {
+        palette(cell.fg, true).unwrap_or_else(|| FG.into())
+    }
+}
+
 fn escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
@@ -79,10 +97,9 @@ fn to_svg(buffer: &Buffer) -> String {
         // backgrounds
         let mut x = 0;
         while x < w {
-            let cell = &buffer[(x, y)];
-            let bg = palette(cell.bg, false);
+            let bg = effective_bg(&buffer[(x, y)]);
             let mut run = 1;
-            while x + run < w && palette(buffer[(x + run, y)].bg, false) == bg {
+            while x + run < w && effective_bg(&buffer[(x + run, y)]) == bg {
                 run += 1;
             }
             if let Some(bg) = bg.filter(|c| c != BG) {
@@ -125,7 +142,7 @@ fn to_svg(buffer: &Buffer) -> String {
                 r#"<text x="{:.1}" y="{:.1}" fill="{}"{style}>{}</text>"#,
                 pad_x + x as f32 * CELL_W,
                 pad_y + (y as f32 + 0.75) * CELL_H,
-                palette(cell.fg, true).unwrap_or_else(|| FG.into()),
+                effective_fg(cell),
                 escape(symbol)
             );
         }

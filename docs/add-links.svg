@@ -864,7 +864,8 @@
 <text x="1080.8" y="187.5" fill="#56b6c2">-</text>
 <text x="1190.0" y="187.5" fill="#98c379">-</text>
 <text x="1265.6" y="187.5" fill="#5c6370">│</text>
-<rect x="450.8" y="192.0" width="84.0" height="18.0" fill="#1f4f82"/>
+<rect x="450.8" y="192.0" width="75.6" height="18.0" fill="#1f4f82"/>
+<rect x="526.4" y="192.0" width="8.4" height="18.0" fill="#f0f2f5"/>
 <text x="14.0" y="205.5" fill="#5c6370">│</text>
 <text x="266.0" y="205.5" fill="#56b6c2">│</text>
 <text x="333.2" y="205.5" fill="#c8ccd4" font-weight="bold">P</text>
@@ -886,7 +887,6 @@
 <text x="492.8" y="205.5" fill="#f0f2f5" font-weight="bold">n</text>
 <text x="509.6" y="205.5" fill="#f0f2f5" font-weight="bold">1</text>
 <text x="518.0" y="205.5" fill="#f0f2f5" font-weight="bold">3</text>
-<text x="526.4" y="205.5" fill="#f0f2f5" font-weight="bold">▏</text>
 <text x="1013.6" y="205.5" fill="#56b6c2">│</text>
 <text x="1265.6" y="205.5" fill="#5c6370">│</text>
 <text x="14.0" y="223.5" fill="#5c6370">│</text>
