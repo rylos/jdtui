@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The add-links form says where the files will go, reading JDownloader's
+  default folder and its "subfolder by package name" packagizer rule.
 - `Ctrl-F` on a "Save to" field picks from the folders JDownloader used
   lately, the folders of the packages in the lists and the mount points.
 - The form cursor no longer takes a cell of its own: the char under it is

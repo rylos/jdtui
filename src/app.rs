@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::api::{Account, AddLinks, JdApi, LinkVariant, RemoveMode, Snapshot, describe_error};
+use crate::api::{Account, AddLinks, FolderPolicy, JdApi, LinkVariant, RemoveMode, Snapshot, describe_error};
 use crate::config::Config;
 use crate::model::{
     Action, Form, MenuEntry, PRIORITIES, Row, RowKey, Tab, build_rows, collect_ids, context_menu, describe,
@@ -169,6 +169,9 @@ pub struct App {
     /// Variants of the link under the cursor, for `Mode::VariantChoice`.
     pub variants: Vec<LinkVariant>,
     pub variant_index: usize,
+    /// How the JDownloader places new packages, read when the add form
+    /// opens; `None` until then or when the config could not be read.
+    pub folder_policy: Option<FolderPolicy>,
     /// Folders offered by `Mode::FolderChoice`, and the form mode to go
     /// back to.
     pub folders: Vec<String>,
@@ -218,6 +221,7 @@ impl App {
             priority_index: 0,
             variants: Vec::new(),
             variant_index: 0,
+            folder_policy: None,
             folders: Vec::new(),
             folder_index: 0,
             folder_return: Mode::List,
@@ -264,6 +268,7 @@ impl App {
             priority_index: 0,
             variants: Vec::new(),
             variant_index: 0,
+            folder_policy: None,
             folders: Vec::new(),
             folder_index: 0,
             folder_return: Mode::List,
@@ -1113,6 +1118,7 @@ impl App {
                 }
             }
             Key::Char('n') => {
+                self.folder_policy = self.with_api(|a| a.folder_policy()).ok();
                 self.form = Some(Form::add_links());
                 self.mode = Mode::Add;
             }

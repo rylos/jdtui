@@ -358,7 +358,26 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
     ) && let Some(form) = &app.form
     {
         draw_list(frame, app, list_area);
-        let popup = centered(area, 90, form.fields.len() as u16 + 6);
+        // The add form gets a line saying where the files will go.
+        let preview = (app.mode == Mode::Add).then(|| match &app.folder_policy {
+            Some(policy) => {
+                let path = crate::model::resolve_folder(form.value("Save to"), form.value("Package name"), policy);
+                let why = if policy.subfolder_by_package && !form.value("Save to").contains("<jd:packagename>") {
+                    "  (JDownloader adds the subfolder)"
+                } else {
+                    ""
+                };
+                Line::from(vec![
+                    Span::styled("  Files will go to  ", Style::new().dim()),
+                    Span::styled(path, Style::new().fg(Color::Yellow)),
+                    Span::styled(why, Style::new().dim()),
+                ])
+            }
+            None => {
+                Line::from(Span::styled("  Could not read where JDownloader will put the files", Style::new().dim()))
+            }
+        });
+        let popup = centered(area, 90, form.fields.len() as u16 + 6 + if preview.is_some() { 2 } else { 0 });
         frame.render_widget(Clear, popup);
         let hint = match app.mode {
             _ if form.active_label() == "Save to" => "Enter apply · Ctrl-F folders · Ctrl-U clear · Esc cancel",
@@ -372,6 +391,10 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         frame.render_widget(block, popup);
         let mut lines = vec![Line::raw("")];
         lines.extend(form_lines(form));
+        if let Some(preview) = preview {
+            lines.push(Line::raw(""));
+            lines.push(preview);
+        }
         frame.render_widget(Paragraph::new(lines), inner);
         return;
     }
