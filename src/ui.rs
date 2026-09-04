@@ -206,16 +206,24 @@ fn form_lines(form: &Form) -> Vec<Line<'static>> {
                     }
                 }
             };
+            if active && matches!(f.kind, FieldKind::Text | FieldKind::Secret) {
+                // The cursor is the char at `f.cursor` drawn in reverse, or
+                // a reversed blank past the end: no extra cell, so the text
+                // does not shift.
+                let shown: Vec<char> = value.content.chars().collect();
+                let at = f.cursor.min(shown.len());
+                let before: String = shown[..at].iter().collect();
+                let under: String = shown.get(at).map(|c| c.to_string()).unwrap_or_else(|| " ".into());
+                let after: String = shown.get(at + 1..).map(|s| s.iter().collect()).unwrap_or_default();
+                let style = selected_style();
+                return Line::from(vec![
+                    label,
+                    Span::styled(before, style),
+                    Span::styled(under, style.add_modifier(Modifier::REVERSED)),
+                    Span::styled(after, style),
+                ]);
+            }
             if active {
-                if matches!(f.kind, FieldKind::Text | FieldKind::Secret) {
-                    // The cursor sits before the char at `f.cursor`.
-                    let shown: Vec<char> = value.content.chars().collect();
-                    let at = f.cursor.min(shown.len());
-                    let mut with_cursor: String = shown[..at].iter().collect();
-                    with_cursor.push('▏');
-                    with_cursor.extend(&shown[at..]);
-                    value.content = with_cursor.into();
-                }
                 value = value.style(selected_style());
             }
             Line::from(vec![label, value])

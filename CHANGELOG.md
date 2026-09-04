@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The form cursor no longer takes a cell of its own: the char under it is
+  drawn in reverse, so the text does not shift while typing.
 - Copy urls also goes through `wl-copy`, `xclip` or `xsel` when a display is
   at hand, for terminals without OSC 52.
 - The device menu (`D`) offers to skip the captchas JDownloader is waiting
