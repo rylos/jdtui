@@ -514,6 +514,15 @@ impl App {
         self.finish(outcome);
     }
 
+    /// Asks JDownloader first whether an update is pending, so the menu
+    /// only offers to install one that exists.
+    fn open_device_menu(&mut self) {
+        let update_available = self.with_api(|a| a.update_available()).unwrap_or(false);
+        self.menu = device_menu(update_available);
+        self.menu_index = 0;
+        self.mode = Mode::DeviceMenu;
+    }
+
     fn run_device_action(&mut self, action: Action) {
         let outcome = match action {
             Action::CheckUpdate => self.with_api(|a| {
@@ -527,17 +536,24 @@ impl App {
             _ => unreachable!(),
         };
         let outcome = outcome.map(|available| match action {
-            Action::CheckUpdate if available => "An update is available: use 'Update and restart'".to_string(),
+            Action::CheckUpdate if available => "An update is available".to_string(),
             Action::CheckUpdate => "JDownloader is up to date".to_string(),
             Action::UpdateAndRestart => "JDownloader is updating and restarting".to_string(),
             Action::RestartJd => "JDownloader is restarting".to_string(),
             Action::ExitJd => "JDownloader is exiting".to_string(),
             _ => "Reconnect started".to_string(),
         });
+        let found_update = action == Action::CheckUpdate && outcome.as_deref() == Ok("An update is available");
         // Not a selection action: keep the marks.
         let marked = std::mem::take(&mut self.marked);
         self.finish(outcome);
         self.marked = marked;
+        if found_update {
+            // Reopen the menu on the entry that installs it.
+            self.menu = device_menu(true);
+            self.menu_index = 1;
+            self.mode = Mode::DeviceMenu;
+        }
     }
 
     fn finish(&mut self, outcome: Result<String, String>) {
@@ -977,11 +993,7 @@ impl App {
             Key::Char('t') if !self.tab.is_grabber() => self.toggle_stop_mark(),
             Key::Char('d') => self.choose_device(),
             Key::Char('A') => self.open_accounts(),
-            Key::Char('D') => {
-                self.menu = device_menu();
-                self.menu_index = 0;
-                self.mode = Mode::DeviceMenu;
-            }
+            Key::Char('D') => self.open_device_menu(),
             Key::Char('e') => {
                 self.form = Some(Form::archive_password());
                 self.mode = Mode::ArchivePassword;

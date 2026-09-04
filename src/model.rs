@@ -273,15 +273,19 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row], stop_mark: Opt
 }
 
 /// What can be done to the JDownloader itself. Nothing that touches the
-/// host machine (shutdown, standby) is offered.
-pub fn device_menu() -> Vec<MenuEntry> {
-    vec![
-        entry("Check for updates", Action::CheckUpdate, false),
-        entry("Update and restart", Action::UpdateAndRestart, true),
+/// host machine (shutdown, standby) is offered, and updating only when
+/// JDownloader says there is one.
+pub fn device_menu(update_available: bool) -> Vec<MenuEntry> {
+    let mut v = vec![entry("Check for updates", Action::CheckUpdate, false)];
+    if update_available {
+        v.push(entry("Update and restart", Action::UpdateAndRestart, true));
+    }
+    v.extend([
         entry("Restart JDownloader", Action::RestartJd, true),
         entry("Reconnect (new IP)", Action::Reconnect, true),
         entry("Exit JDownloader", Action::ExitJd, true),
-    ]
+    ]);
+    v
 }
 
 // --- forms ------------------------------------------------------------------
