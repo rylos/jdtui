@@ -3,6 +3,14 @@ name = "jdtui"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "jdtui"
+path = "src/lib.rs"
+
+[[bin]]
+name = "jdtui"
+path = "src/main.rs"
+
 [dependencies]
 aes = "0.9.3"
 anyhow = "1.0.104"
