@@ -1,6 +1,6 @@
 [package]
 name = "jdtui"
-version = "1.1.1"
+version = "1.2.0"
 edition = "2024"
 description = "A terminal UI for JDownloader 2, over the My.JDownloader API"
 license = "MIT"
