@@ -20,11 +20,20 @@ instance connected to the account.
 What it shows is the same tree as the desktop GUI: packages with their links,
 split across a Downloads and a Link Grabber tab.
 
-- mark several rows and act on all of them at once: force, reset,
-  enable/disable, remove
+- mark several rows and act on all of them at once: force, resume, reset,
+  enable/disable, priority, rename, download folder, move to a new package,
+  split by hoster, stop mark, remove
 - removing from the Downloads tab asks what to do with the files already on
   disk, the same three choices the desktop dialog offers
-- properties panel, and an add-links form with the fields of the GUI's dialog
+- start/stop and pause, captchas and extraction in the header, video
+  variants in the Link Grabber, copy the urls of a selection
+- premium accounts: traffic, expiry, enable/disable/refresh
+- the JDownloader itself: update check, restart, reconnect
+- an add-links form with the fields of the GUI's dialog, properties panel,
+  filter as you type, a key reference on ?
+- it listens to JDownloader's event channel, so links added from the browser
+  or another client show up within a second or two, and it polls lightly
+  while nothing downloads
 - switch between the JDownloader instances on the account without restarting
 - a single static binary, no runtime to install
 
