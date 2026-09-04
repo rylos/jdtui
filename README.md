@@ -203,6 +203,14 @@ See [CHANGELOG.md](CHANGELOG.md).
 Started as a rewrite of [jdsh](https://github.com/al00x/jdsh), whose interactive
 mode I had been extending in Python before moving to a single binary.
 
+## 🍺 Buy me a beer
+
+If jdtui saves you a trip to the browser now and then, a beer is welcome, in ETH:
+
+```
+0xF4dd2D015b913E30429974c2b82e15df5b92fB19
+```
+
 ## License
 
 MIT
