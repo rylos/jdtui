@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `PgUp`/`PgDn` move by a page, `Home`/`End` (or `g`/`G`) jump to the first
+  and last row.
 - The add-links form says where the files will go, reading JDownloader's
   default folder and its "subfolder by package name" packagizer rule.
 - `Ctrl-F` on a "Save to" field picks from the folders JDownloader used

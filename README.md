@@ -125,6 +125,8 @@ standby) is there.
 | --- | --- |
 | `Tab` | Switch between Downloads and Link Grabber |
 | `↑` `↓` (or `k` `j`) | Move the cursor |
+| `PgUp` `PgDn` | Move by a page |
+| `Home` `End` (or `g` `G`) | First / last row |
 | `→` `←` | Expand / collapse a package |
 | `/` | Filter the rows by name, hoster or status; `Esc` clears it |
 | `Space` | Mark the row under the cursor |
