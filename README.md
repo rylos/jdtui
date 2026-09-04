@@ -80,7 +80,12 @@ running.
 
 `n` opens the same form as the GUI's add dialog: urls, package name, destination
 folder, extract and download passwords, priority and autostart. Pasting a list
-of urls works; newlines become separators. On the folder field, `Ctrl-F` lists
+of urls works; newlines become separators. A line under the fields says where
+the files will end up: jdtui reads JDownloader's default folder and whether the
+packagizer's "create subfolder by package name" rule is on, so `/data` shows as
+`/data/<package name>` when JDownloader will add the subfolder itself, and a
+`<jd:packagename>` placeholder in the path is never doubled. On the folder
+field, `Ctrl-F` lists
 the folders JDownloader used lately (the same list as the GUI's combo,
 `<jd:packagename>` placeholders included), the folders of the packages in the
 lists and the mount points; pick one and edit it. The same picker serves the

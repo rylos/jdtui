@@ -353,6 +353,8 @@ fn main() {
     form.next();
     form.type_str("Debian 13");
     app.form = Some(form);
+    app.folder_policy =
+        Some(jdtui::api::FolderPolicy { default_folder: "/downloads".into(), subfolder_by_package: true });
     app.mode = Mode::Add;
     shot("add-links", &app);
 

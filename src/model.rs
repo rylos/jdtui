@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use crate::api::{Link, Package, RemoveMode, Snapshot};
+use crate::api::{FolderPolicy, Link, Package, RemoveMode, Snapshot};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
@@ -322,6 +322,23 @@ pub fn device_menu(update_available: bool, captchas: usize) -> Vec<MenuEntry> {
     v
 }
 
+/// Where a package added with `destination` ends up, given how the
+/// JDownloader is set: empty means its default folder, and with the
+/// "subfolder by package name" rule on it appends the package name unless
+/// the path already carries the `<jd:packagename>` placeholder. The
+/// placeholder is shown as the package name when one is known.
+pub fn resolve_folder(destination: &str, package_name: &str, policy: &FolderPolicy) -> String {
+    const TAG: &str = "<jd:packagename>";
+    let base = destination.trim();
+    let mut path =
+        if base.is_empty() { policy.default_folder.trim_end_matches('/').to_string() } else { base.to_string() };
+    if policy.subfolder_by_package && !path.contains(TAG) {
+        path = format!("{}/{TAG}", path.trim_end_matches('/'));
+    }
+    let name = if package_name.trim().is_empty() { "<package name>" } else { package_name.trim() };
+    path.replace(TAG, name)
+}
+
 // --- forms ------------------------------------------------------------------
 
 pub const PRIORITIES: [&str; 7] = ["HIGHEST", "HIGHER", "HIGH", "DEFAULT", "LOW", "LOWER", "LOWEST"];
@@ -632,6 +649,20 @@ mod tests {
         // Host matches too.
         assert_eq!(build_rows(&packages, &expanded, "cdn").len(), 2);
         assert!(build_rows(&packages, &expanded, "nothing").is_empty());
+    }
+
+    #[test]
+    fn folder_resolution_follows_the_packagizer_rule() {
+        let on = FolderPolicy { default_folder: "/output".into(), subfolder_by_package: true };
+        let off = FolderPolicy { default_folder: "/output".into(), subfolder_by_package: false };
+        assert_eq!(resolve_folder("", "Debian", &on), "/output/Debian");
+        assert_eq!(resolve_folder("", "Debian", &off), "/output");
+        assert_eq!(resolve_folder("/data/", "Debian", &on), "/data/Debian");
+        assert_eq!(resolve_folder("/data", "Debian", &off), "/data");
+        // The placeholder counts as the subfolder already: no doubling.
+        assert_eq!(resolve_folder("/data/<jd:packagename>", "Debian", &on), "/data/Debian");
+        assert_eq!(resolve_folder("/data/<jd:packagename>", "Debian", &off), "/data/Debian");
+        assert_eq!(resolve_folder("/data", "", &on), "/data/<package name>");
     }
 
     #[test]

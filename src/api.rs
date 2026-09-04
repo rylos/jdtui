@@ -184,6 +184,15 @@ impl RemoveMode {
     }
 }
 
+/// How JDownloader places new packages: its default folder, and whether
+/// the packagizer's "subfolder by package name" rule is on. Read from the
+/// config, so the interface can say where files will go before adding.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FolderPolicy {
+    pub default_folder: String,
+    pub subfolder_by_package: bool,
+}
+
 /// A mount point on the JDownloader machine.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct StorageInfo {
@@ -657,6 +666,25 @@ impl JdApi {
 
     pub fn unsubscribe_events(&mut self, subscription: i64) -> Result<()> {
         self.call_unit("/events/unsubscribe", &[json!(subscription)])
+    }
+
+    /// Three config reads: the default folder, whether the packagizer runs
+    /// at all, and its rule list, where "subfolder by package name" is the
+    /// static rule `SubFolderByPackageRule`.
+    pub fn folder_policy(&mut self) -> Result<FolderPolicy> {
+        const GENERAL: &str = "org.jdownloader.settings.GeneralSettings";
+        const PACKAGIZER: &str = "org.jdownloader.controlling.packagizer.PackagizerSettings";
+        let default_folder: String =
+            self.call("/config/get", &[json!(GENERAL), Value::Null, json!("DefaultDownloadFolder")])?;
+        let enabled: bool = self.call("/config/get", &[json!(PACKAGIZER), Value::Null, json!("PackagizerEnabled")])?;
+        let rules: Vec<Value> = self.call("/config/get", &[json!(PACKAGIZER), Value::Null, json!("RuleList")])?;
+        let subfolder_by_package = enabled
+            && rules.iter().any(|r| {
+                let by_package = r["id"] == "SubFolderByPackageRule"
+                    || r["downloadDestination"].as_str().is_some_and(|d| d.contains("<jd:packagename>"));
+                by_package && r["enabled"] == true && r["matchAlwaysFilter"]["enabled"] == true
+            });
+        Ok(FolderPolicy { default_folder, subfolder_by_package })
     }
 
     /// The download folders used lately, as the GUI's folder combo lists
