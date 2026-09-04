@@ -76,14 +76,38 @@ fn run(terminal: &mut ratatui::DefaultTerminal, mut app: App) -> Result<()> {
     Ok(())
 }
 
-/// OSC 52: the terminal puts the text on the clipboard, wherever it runs;
-/// ignored by terminals that do not support it.
+/// OSC 52 first: the terminal puts the text on the clipboard wherever it
+/// runs, including over SSH; terminals without it ignore the sequence. Then
+/// a local clipboard tool when a display is at hand, for those terminals.
 fn copy_to_clipboard(text: &str) {
     use base64::Engine as _;
     let encoded = base64::engine::general_purpose::STANDARD.encode(text);
     let mut out = stdout();
     let _ = write!(out, "\x1b]52;c;{encoded}\x07");
     let _ = out.flush();
+
+    let tools: &[&[&str]] = if std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        &[&["wl-copy"], &["xclip", "-selection", "clipboard"], &["xsel", "--clipboard", "--input"]]
+    } else if std::env::var_os("DISPLAY").is_some() {
+        &[&["xclip", "-selection", "clipboard"], &["xsel", "--clipboard", "--input"]]
+    } else {
+        &[]
+    };
+    for tool in tools {
+        let spawned = std::process::Command::new(tool[0])
+            .args(&tool[1..])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+        if let Ok(mut child) = spawned {
+            if let Some(mut stdin) = child.stdin.take() {
+                let _ = stdin.write_all(text.as_bytes());
+            }
+            let _ = child.wait();
+            break;
+        }
+    }
 }
 
 fn translate(code: KeyCode, modifiers: KeyModifiers) -> Option<Key> {

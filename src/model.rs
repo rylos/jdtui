@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use crate::api::{Package, RemoveMode, Snapshot};
+use crate::api::{Link, Package, RemoveMode, Snapshot};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
@@ -54,14 +54,27 @@ pub fn packages_of(snapshot: &Snapshot, tab: Tab) -> &[Package] {
     }
 }
 
-pub fn build_rows(packages: &[Package], expanded: &HashSet<i64>) -> Vec<Row> {
+/// The visible rows. With a filter, a package stays if it matches by
+/// itself (then all its links show when expanded) or through some of its
+/// links (then only those show).
+pub fn build_rows(packages: &[Package], expanded: &HashSet<i64>, filter: &str) -> Vec<Row> {
+    let needle = filter.trim().to_lowercase();
+    let has = |s: Option<&str>| s.is_some_and(|s| s.to_lowercase().contains(&needle));
+    let link_matches = |l: &Link| has(Some(&l.name)) || has(l.host.as_deref()) || has(l.status.as_deref());
     let mut rows = Vec::new();
     for (p, pkg) in packages.iter().enumerate() {
+        let pkg_matches = needle.is_empty()
+            || has(Some(&pkg.name))
+            || has(pkg.status.as_deref())
+            || has(pkg.save_to.as_deref())
+            || pkg.hosts.iter().flatten().any(|h| has(Some(h)));
+        let links: Vec<usize> = (0..pkg.links.len()).filter(|&l| pkg_matches || link_matches(&pkg.links[l])).collect();
+        if !pkg_matches && links.is_empty() {
+            continue;
+        }
         rows.push(Row { kind: RowKind::Package, package: p, link: None });
         if expanded.contains(&pkg.uuid) {
-            for l in 0..pkg.links.len() {
-                rows.push(Row { kind: RowKind::Link, package: p, link: Some(l) });
-            }
+            rows.extend(links.into_iter().map(|l| Row { kind: RowKind::Link, package: p, link: Some(l) }));
         }
     }
     rows
@@ -185,6 +198,8 @@ pub enum Action {
     ExtractNow,
     // The JDownloader itself, from the device menu; no selection involved.
     CheckUpdate,
+    /// Give up on every captcha waiting; the blocked links are skipped.
+    SkipCaptchas,
     UpdateAndRestart,
     RestartJd,
     ExitJd,
@@ -197,7 +212,12 @@ impl Action {
     pub fn is_device(self) -> bool {
         matches!(
             self,
-            Action::CheckUpdate | Action::UpdateAndRestart | Action::RestartJd | Action::ExitJd | Action::Reconnect
+            Action::CheckUpdate
+                | Action::SkipCaptchas
+                | Action::UpdateAndRestart
+                | Action::RestartJd
+                | Action::ExitJd
+                | Action::Reconnect
         )
     }
 }
@@ -275,8 +295,13 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row], stop_mark: Opt
 /// What can be done to the JDownloader itself. Nothing that touches the
 /// host machine (shutdown, standby) is offered, and updating only when
 /// JDownloader says there is one.
-pub fn device_menu(update_available: bool) -> Vec<MenuEntry> {
-    let mut v = vec![entry("Check for updates", Action::CheckUpdate, false)];
+pub fn device_menu(update_available: bool, captchas: usize) -> Vec<MenuEntry> {
+    let mut v = Vec::new();
+    if captchas > 0 {
+        let label = format!("Skip {captchas} waiting captcha{}", if captchas == 1 { "" } else { "s" });
+        v.push(entry(label, Action::SkipCaptchas, true));
+    }
+    v.push(entry("Check for updates", Action::CheckUpdate, false));
     if update_available {
         v.push(entry("Update and restart", Action::UpdateAndRestart, true));
     }
@@ -426,6 +451,11 @@ impl Form {
         }
     }
 
+    pub fn filter(current: &str) -> Self {
+        let field = Field::text("Filter", "name, hoster or status; case does not matter").with_text(current);
+        Form { title: "Filter the list", fields: vec![field], index: 0 }
+    }
+
     pub fn new_package() -> Self {
         Form {
             title: "Move to a new package",
@@ -544,6 +574,42 @@ mod tests {
         form.clear();
         assert_eq!(form.value("Name"), "");
         assert_eq!(form.fields[0].cursor, 0);
+    }
+
+    #[test]
+    fn filter_keeps_matching_packages_and_links() {
+        let pkg = |uuid: i64, name: &str, links: &[(&str, &str)]| Package {
+            uuid,
+            name: name.into(),
+            links: links
+                .iter()
+                .enumerate()
+                .map(|(i, (n, h))| Link {
+                    uuid: uuid * 100 + i as i64,
+                    name: (*n).into(),
+                    host: Some((*h).into()),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let packages = vec![
+            pkg(1, "Debian images", &[("debian.iso", "mirror.org"), ("sha256", "mirror.org")]),
+            pkg(2, "Ubuntu", &[("ubuntu.iso", "cdn.net")]),
+        ];
+        let expanded: HashSet<i64> = [1, 2].into_iter().collect();
+
+        assert_eq!(build_rows(&packages, &expanded, "").len(), 5);
+        // The package matches: all its links stay.
+        let rows = build_rows(&packages, &expanded, "DEBIAN");
+        assert_eq!(rows.len(), 3);
+        // Only a link matches: the package stays with that link alone.
+        let rows = build_rows(&packages, &expanded, "sha");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[1].link, Some(1));
+        // Host matches too.
+        assert_eq!(build_rows(&packages, &expanded, "cdn").len(), 2);
+        assert!(build_rows(&packages, &expanded, "nothing").is_empty());
     }
 
     #[test]

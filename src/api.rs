@@ -514,6 +514,11 @@ impl JdApi {
         self.call("/captcha/list", &[])
     }
 
+    /// Give up on one captcha; the link it blocks is skipped.
+    pub fn skip_captcha(&mut self, id: i64) -> Result<()> {
+        self.call_unit("/captcha/skip", &[json!(id), json!("SINGLE")])
+    }
+
     pub fn accounts(&mut self) -> Result<Vec<Account>> {
         self.call(
             "/accountsV2/listAccounts",

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Copy urls also goes through `wl-copy`, `xclip` or `xsel` when a display is
+  at hand, for terminals without OSC 52.
+- The device menu (`D`) offers to skip the captchas JDownloader is waiting
+  on.
+- `/` filters the list by name, hoster or status as you type; `Esc` clears
+  it.
+
 ## 1.1.1 — 2026-09-04
 
 - Text fields have a cursor: `←` `→`, `Home`/`End` (or Ctrl-A/Ctrl-E),

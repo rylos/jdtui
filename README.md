@@ -113,6 +113,7 @@ standby) is there.
 | `Tab` | Switch between Downloads and Link Grabber |
 | `↑` `↓` (or `k` `j`) | Move the cursor |
 | `→` `←` | Expand / collapse a package |
+| `/` | Filter the rows by name, hoster or status; `Esc` clears it |
 | `Space` | Mark the row under the cursor |
 | `a` | Mark every row, or clear the marks |
 | `Esc` | Clear the selection |
@@ -128,7 +129,7 @@ standby) is there.
 | `s` | Start / stop downloads |
 | `P` | Pause / resume downloads |
 | `A` | Premium accounts: enable, disable, refresh |
-| `D` | The JDownloader itself: updates, restart, reconnect, exit |
+| `D` | The JDownloader itself: captchas, updates, restart, reconnect, exit |
 | `d` | Switch to another JDownloader of the account |
 | `?` | Show every key |
 | `q` | Quit |

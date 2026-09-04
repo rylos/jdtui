@@ -340,8 +340,10 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         (area, None)
     };
 
-    if matches!(app.mode, Mode::Add | Mode::Rename | Mode::Directory | Mode::NewPackage | Mode::ArchivePassword)
-        && let Some(form) = &app.form
+    if matches!(
+        app.mode,
+        Mode::Add | Mode::Rename | Mode::Directory | Mode::NewPackage | Mode::ArchivePassword | Mode::Filter
+    ) && let Some(form) = &app.form
     {
         draw_list(frame, app, list_area);
         let popup = centered(area, 90, form.fields.len() as u16 + 6);
@@ -349,6 +351,7 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         let hint = match app.mode {
             Mode::Add if form.is_valid() => "Enter add · Tab/↑↓ field · ←→ move / change · Esc cancel",
             Mode::Add => "Paste at least one url · Tab/↑↓ field · Esc cancel",
+            Mode::Filter => "Enter keep · Esc clear",
             _ => "Enter apply · ←→ Home End move · Ctrl-U clear · Esc cancel",
         };
         let block = panel(form.title, Some(hint));
@@ -399,6 +402,12 @@ fn draw_list(frame: &mut Frame, app: &App, area: Rect) {
     let mut title_line = Line::from(vec![Span::raw(format!(" {title} "))]);
     if !app.marked.is_empty() {
         title_line.push_span(Span::styled(format!("({} selected) ", app.marked.len()), Style::new().fg(accent())));
+    }
+    if !app.filter.is_empty() {
+        title_line.push_span(Span::styled(
+            format!("(filter: {}) ", crate::app::truncate(&app.filter, 30)),
+            Style::new().fg(Color::Yellow),
+        ));
     }
     if app.tab == Tab::Downloads
         && let Some(uuid) = app.snapshot.stop_mark
@@ -793,14 +802,18 @@ fn draw_help(frame: &mut Frame, area: Rect) {
         }
         columns
     };
+    let tallest = |columns: &[Vec<Line>]| columns.iter().map(|c| c.len()).max().unwrap_or(0);
     let mut columns = layout(1);
-    if columns.iter().map(|c| c.len()).max().unwrap_or(0) > available {
+    // Tight: no blank lines between sections, and none above them either.
+    let mut top_blank = 1;
+    if tallest(&columns) > available {
         columns = layout(0);
+        top_blank = 0;
     }
 
     let column_width = 58u16;
     let width = if two_columns { column_width * 2 + 2 } else { column_width + 2 };
-    let height = (columns.iter().map(|c| c.len()).max().unwrap_or(0) as u16 + 3).min(area.height);
+    let height = ((tallest(&columns) + top_blank) as u16 + 2).min(area.height);
     let popup = centered(area, width, height);
     frame.render_widget(Clear, popup);
     let block = panel("Keys", Some("Esc close"));
@@ -808,7 +821,7 @@ fn draw_help(frame: &mut Frame, area: Rect) {
     frame.render_widget(block, popup);
     let cols = Layout::horizontal([Constraint::Length(column_width), Constraint::Fill(1)]).split(inner);
     for (i, lines) in columns.into_iter().enumerate() {
-        let mut text = vec![Line::raw("")];
+        let mut text = vec![Line::raw(""); top_blank];
         text.extend(lines);
         frame.render_widget(Paragraph::new(text), cols[i]);
     }
@@ -1008,7 +1021,7 @@ mod tests {
     fn properties_show_the_link_details() {
         let mut app = App::with_snapshot(sample());
         app.expanded.insert(10);
-        app.rows = crate::model::build_rows(&app.snapshot.downloads, &app.expanded);
+        app.rows = crate::model::build_rows(&app.snapshot.downloads, &app.expanded, "");
         app.cursor = 1; // the link under the package
         app.mode = crate::app::Mode::Properties;
         assert!(shows(&app, "Properties"));
