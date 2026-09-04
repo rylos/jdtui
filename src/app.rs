@@ -41,6 +41,10 @@ pub enum Mode {
     /// Choosing a priority for the selection.
     PriorityChoice,
     Add,
+    /// Editing the name of the row under the cursor, in `form`.
+    Rename,
+    /// Editing the download folder of the selected packages, in `form`.
+    Directory,
     /// The full key reference; the footer only shows the frequent ones.
     Help,
 }
@@ -370,6 +374,17 @@ impl App {
                 self.mode = Mode::Properties;
                 return;
             }
+            Action::Rename => {
+                self.form = Some(Form::rename(row_name(self.packages(), &targets[0])));
+                self.mode = Mode::Rename;
+                return;
+            }
+            Action::Directory => {
+                let current = self.packages()[targets[0].package].save_to.clone().unwrap_or_default();
+                self.form = Some(Form::directory(&current));
+                self.mode = Mode::Directory;
+                return;
+            }
             Action::Priority => {
                 // Start from the current priority when there is one row.
                 let current = if targets.len() == 1 { row_priority(self.packages(), &targets[0]) } else { None };
@@ -410,7 +425,9 @@ impl App {
             Action::PriorityTo(priority) => self
                 .with_api(|a| a.set_priority(priority, &links, &pkgs, grabber))
                 .map(|_| format!("{what} set to priority {}", priority.to_lowercase())),
-            Action::ToggleExpand | Action::Properties | Action::Priority => unreachable!(),
+            Action::ToggleExpand | Action::Properties | Action::Priority | Action::Rename | Action::Directory => {
+                unreachable!()
+            }
         };
         self.finish(outcome);
     }
@@ -466,6 +483,52 @@ impl App {
         let outcome = self
             .with_api(|a| a.add_links(&req))
             .map(|_| format!("Sent {count} url{} to the Link Grabber", if count == 1 { "" } else { "s" }));
+        if outcome.is_ok() {
+            self.form = None;
+        }
+        self.finish(outcome);
+    }
+
+    fn submit_rename(&mut self) {
+        let Some(form) = &self.form else { return };
+        let name = form.value("Name").trim().to_string();
+        if name.is_empty() {
+            self.message = Some(("The name cannot be empty".into(), true));
+            return;
+        }
+        let Some(row) = self.target_rows().into_iter().next() else { return };
+        let grabber = self.tab.is_grabber();
+        let outcome = match row.link {
+            None => {
+                let uuid = self.packages()[row.package].uuid;
+                self.with_api(|a| a.rename_package(uuid, &name, grabber))
+            }
+            Some(l) => {
+                let uuid = self.packages()[row.package].links[l].uuid;
+                self.with_api(|a| a.rename_link(uuid, &name, grabber))
+            }
+        }
+        .map(|_| format!("Renamed to '{}'", truncate(&name, 60)));
+        if outcome.is_ok() {
+            self.form = None;
+        }
+        self.finish(outcome);
+    }
+
+    fn submit_directory(&mut self) {
+        let Some(form) = &self.form else { return };
+        let dir = form.value("Save to").trim().to_string();
+        if dir.is_empty() {
+            self.message = Some(("The folder cannot be empty".into(), true));
+            return;
+        }
+        let targets = self.target_rows();
+        let (_, pkgs) = collect_ids(self.packages(), &targets);
+        let grabber = self.tab.is_grabber();
+        let what = describe(&targets);
+        let outcome = self
+            .with_api(|a| a.set_download_directory(&dir, &pkgs, grabber))
+            .map(|_| format!("{what} will be saved to {}", truncate(&dir, 60)));
         if outcome.is_ok() {
             self.form = None;
         }
@@ -533,7 +596,7 @@ impl App {
                         self.mode = Mode::List;
                     }
                 },
-                Mode::Add => self.handle_add_key(key),
+                Mode::Add | Mode::Rename | Mode::Directory => self.handle_form_key(key),
                 Mode::Help => {
                     if matches!(key, Key::Esc | Key::Enter | Key::Char('q' | '?' | 'h')) {
                         self.mode = Mode::List;
@@ -699,14 +762,19 @@ impl App {
         }
     }
 
-    fn handle_add_key(&mut self, key: Key) {
+    /// Keys of the popup forms: add links, rename, download folder.
+    fn handle_form_key(&mut self, key: Key) {
         match key {
             Key::Esc => {
                 self.form = None;
                 self.mode = Mode::List;
                 self.message = Some(("Cancelled".into(), false));
             }
-            Key::Enter => self.submit_add_form(),
+            Key::Enter => match self.mode {
+                Mode::Rename => self.submit_rename(),
+                Mode::Directory => self.submit_directory(),
+                _ => self.submit_add_form(),
+            },
             other => {
                 if let Some(form) = &mut self.form {
                     form_edit(form, other);

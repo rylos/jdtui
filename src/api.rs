@@ -525,4 +525,57 @@ mod live {
         println!("state after resume: {after}");
         assert_eq!(after, before);
     }
+
+    /// Priority, rename and download folder on a throwaway grabber package,
+    /// checked by reading them back; then removed.
+    #[test]
+    #[ignore]
+    fn edits_are_applied_to_a_grabber_package() {
+        const NAME: &str = "jdtui-edit-test";
+        let mut api = api();
+
+        api.add_links(&AddLinks {
+            links: "http://example.com/jdtui-edit-test.bin".into(),
+            package_name: NAME.into(),
+            ..Default::default()
+        })
+        .expect("add links");
+        let pkg = wait_for("the package to appear in the grabber", || {
+            api.grabber().ok()?.into_iter().find(|p| p.name == NAME)
+        });
+        println!("created in the link grabber: {NAME} ({})", pkg.uuid);
+
+        api.set_priority("HIGH", &[], &[pkg.uuid], true).expect("set priority");
+        wait_for("the priority to read back", || {
+            let p = api.grabber().ok()?.into_iter().find(|p| p.uuid == pkg.uuid)?;
+            (p.priority.as_deref() == Some("HIGH")).then_some(())
+        });
+        println!("priority HIGH read back");
+
+        let renamed = format!("{NAME}-renamed");
+        api.rename_package(pkg.uuid, &renamed, true).expect("rename package");
+        wait_for("the new name to read back", || {
+            api.grabber().ok()?.into_iter().find(|p| p.uuid == pkg.uuid && p.name == renamed).map(|_| ())
+        });
+        println!("renamed to {renamed}");
+
+        let link = pkg.links.first().expect("a link").uuid;
+        api.rename_link(link, "jdtui-edit-test-renamed.bin", true).expect("rename link");
+        wait_for("the link name to read back", || {
+            let p = api.grabber().ok()?.into_iter().find(|p| p.uuid == pkg.uuid)?;
+            p.links.iter().any(|l| l.uuid == link && l.name == "jdtui-edit-test-renamed.bin").then_some(())
+        });
+        println!("link renamed");
+
+        let dir = format!("{}/jdtui-edit-test", pkg.save_to.clone().unwrap_or_default().trim_end_matches('/'));
+        api.set_download_directory(&dir, &[pkg.uuid], true).expect("set download directory");
+        wait_for("the folder to read back", || {
+            let p = api.grabber().ok()?.into_iter().find(|p| p.uuid == pkg.uuid)?;
+            (p.save_to.as_deref().map(|s| s.trim_end_matches(['/', '\\'])) == Some(dir.as_str())).then_some(())
+        });
+        println!("download folder set to {dir}");
+
+        api.remove(&[], &[pkg.uuid], true).expect("remove");
+        wait_for("the package to disappear", || api.grabber().ok()?.iter().all(|p| p.uuid != pkg.uuid).then_some(()));
+    }
 }

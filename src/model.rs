@@ -142,6 +142,10 @@ pub enum Action {
     Priority,
     /// Apply a priority, one of `PRIORITIES`.
     PriorityTo(&'static str),
+    /// Open the rename form; one row only.
+    Rename,
+    /// Open the download folder form; packages only.
+    Directory,
     Properties,
 }
 
@@ -182,8 +186,18 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row]) -> Vec<MenuEnt
         v.push(entry(format!("Remove{suffix}"), Action::Remove, true));
         v
     };
-    let before_remove = entries.len() - 1;
-    entries.insert(before_remove, entry("Set priority…", Action::Priority, false));
+    let mut before_remove = entries.len() - 1;
+    let mut insert = |e: MenuEntry| {
+        entries.insert(before_remove, e);
+        before_remove += 1;
+    };
+    insert(entry("Set priority…", Action::Priority, false));
+    if single {
+        insert(entry("Rename…", Action::Rename, false));
+    }
+    if rows.iter().all(|r| r.is_package()) {
+        insert(entry("Set download folder…", Action::Directory, false));
+    }
 
     if single && rows[0].is_package() {
         entries.insert(0, entry("Collapse / Expand", Action::ToggleExpand, false));
@@ -257,6 +271,18 @@ impl Form {
             ],
             index: 0,
         }
+    }
+
+    pub fn rename(current: &str) -> Self {
+        let mut name = Field::text("Name", "");
+        name.text = current.to_string();
+        Form { title: "Rename", fields: vec![name], index: 0 }
+    }
+
+    pub fn directory(current: &str) -> Self {
+        let mut dir = Field::text("Save to", "absolute path on the JDownloader machine");
+        dir.text = current.to_string();
+        Form { title: "Download folder", fields: vec![dir], index: 0 }
     }
 
     pub fn value(&self, label: &str) -> &str {
