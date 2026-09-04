@@ -1,28 +1,42 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 — 2026-09-04
 
-- `PgUp`/`PgDn` move by a page, `Home`/`End` (or `g`/`G`) jump to the first
-  and last row.
-- The add-links form says where the files will go, reading JDownloader's
-  default folder and its "subfolder by package name" packagizer rule.
-- `Ctrl-F` on a "Save to" field picks from the folders JDownloader used
-  lately, the folders of the packages in the lists and the mount points.
-- The form cursor no longer takes a cell of its own: the char under it is
-  drawn in reverse, so the text does not shift while typing.
-- Copy urls also goes through `wl-copy`, `xclip` or `xsel` when a display is
-  at hand, for terminals without OSC 52.
-- The device menu (`D`) offers to skip the captchas JDownloader is waiting
-  on.
-- `/` filters the list by name, hoster or status as you type; `Esc` clears
-  it.
-- Link Grabber links that come in several variants (video qualities, audio
-  only) show the chosen one, and the context menu switches it.
+Live updates, video variants, and a few things the forms and lists were
+missing.
+
+### Live
+
 - jdtui listens to JDownloader's event channel: changes made elsewhere show
   up within a second or two, and while nothing downloads the periodic
   refresh slows to thirty seconds. `events = false` in the config or
   `--no-events` turns it off. The header says `live` while the channel is
   up.
+
+### Link Grabber
+
+- Links that come in several variants (video qualities, audio only) show
+  the chosen one, and the context menu switches it.
+- The add-links form says where the files will go, reading JDownloader's
+  default folder and its "subfolder by package name" packagizer rule.
+- `Ctrl-F` on a "Save to" field picks from the folders JDownloader used
+  lately, the folders of the packages in the lists and the mount points.
+
+### Lists and forms
+
+- `/` filters the list by name, hoster or status as you type; `Esc` clears
+  it.
+- `PgUp`/`PgDn` move by a page, `Home`/`End` (or `g`/`G`) jump to the first
+  and last row.
+- The form cursor no longer takes a cell of its own: the char under it is
+  drawn in reverse, so the text does not shift while typing.
+
+### Other
+
+- Copy urls also goes through `wl-copy`, `xclip` or `xsel` when a display is
+  at hand, for terminals without OSC 52.
+- The device menu (`D`) offers to skip the captchas JDownloader is waiting
+  on.
 
 ## 1.1.1 — 2026-09-04
 
