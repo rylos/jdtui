@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.1 — 2026-09-04
 
 - Text fields have a cursor: `←` `→`, `Home`/`End` (or Ctrl-A/Ctrl-E),
   `Delete`, and Ctrl-U to clear the field. Typing inserts at the cursor
