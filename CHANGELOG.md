@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 — 2026-09-06
 
 - Direct connection: calls go straight to JDownloader when one of the
   addresses it reports (or `direct_addresses` in the config) answers a
