@@ -92,7 +92,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
         "Actions",
         &[
             ("Enter", "Context menu on the selection"),
-            ("p", "Properties of the selected row"),
+            ("i  P", "Properties of the selected row"),
             ("n", "Add links to the Link Grabber"),
             ("t", "Stop after this row (again to clear)"),
             ("y", "Copy the urls of the selection"),
@@ -111,7 +111,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
         "JDownloader",
         &[
             ("s", "Start / stop downloads"),
-            ("P", "Pause / resume downloads"),
+            ("p", "Pause / resume downloads"),
             ("A", "Accounts: enable, disable, refresh"),
             ("D", "Captchas, updates, restart, reconnect, exit"),
             ("d", "Switch to another JDownloader of the account"),
@@ -936,7 +936,7 @@ impl App {
                 Mode::List => self.handle_list_key(key),
                 Mode::Menu | Mode::DeviceMenu => self.handle_menu_key(key),
                 Mode::Properties => {
-                    if matches!(key, Key::Esc | Key::Enter | Key::Char('q' | 'p')) {
+                    if matches!(key, Key::Esc | Key::Enter | Key::Char('q' | 'i' | 'P')) {
                         self.mode = Mode::List;
                     }
                 }
@@ -1129,7 +1129,7 @@ impl App {
                     self.mode = Mode::Menu;
                 }
             }
-            Key::Char('p') => {
+            Key::Char('i') | Key::Char('P') => {
                 if self.current_row().is_some() {
                     self.mode = Mode::Properties;
                 }
@@ -1140,7 +1140,7 @@ impl App {
                 self.mode = Mode::Add;
             }
             Key::Char('s') => self.toggle_downloads(),
-            Key::Char('P') => self.toggle_pause(),
+            Key::Char('p') => self.toggle_pause(),
             Key::Char('t') if !self.tab.is_grabber() => self.toggle_stop_mark(),
             Key::Char('d') => self.choose_device(),
             Key::Char('A') => self.open_accounts(),

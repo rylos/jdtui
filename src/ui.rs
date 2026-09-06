@@ -1035,7 +1035,7 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
                 key("s"),
                 label(" start/stop"),
                 sep(),
-                key("P"),
+                key("p"),
                 label(if app.snapshot.is_paused() { " resume" } else { " pause" }),
                 sep(),
                 key("?"),

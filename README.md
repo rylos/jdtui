@@ -36,7 +36,7 @@ another one, or start with `jdtui --choose-device`.
 The header shows the state of the download controller (running, paused,
 stopped), the total speed as JDownloader reports it, how much is loaded and
 left, and anything that is waiting on you: captchas to solve, archives being
-extracted. `s` starts and stops the downloads, `P` pauses and resumes them.
+extracted. `s` starts and stops the downloads, `p` pauses and resumes them.
 
 The footer lists the frequent keys; `?` opens the full reference.
 
@@ -133,7 +133,7 @@ standby) is there.
 | `a` | Mark every row, or clear the marks |
 | `Esc` | Clear the selection |
 | `Enter` | Open the context menu on the selection |
-| `p` | Properties of the selected row |
+| `i` (or `P`) | Properties of the selected row |
 | `n` | Add links to the Link Grabber |
 | `t` | Stop downloads after the row under the cursor; again to clear |
 | `y` | Show the urls of the selection and copy them to the clipboard |
@@ -142,7 +142,7 @@ standby) is there.
 | `C` | Clear the Link Grabber |
 | `x` | Abort link crawling |
 | `s` | Start / stop downloads |
-| `P` | Pause / resume downloads |
+| `p` | Pause / resume downloads |
 | `A` | Premium accounts: enable, disable, refresh |
 | `D` | The JDownloader itself: captchas, updates, restart, reconnect, exit |
 | `d` | Switch to another JDownloader of the account |
