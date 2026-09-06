@@ -5,6 +5,7 @@
 //! instance, simply omits `enabled`).
 
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -134,6 +135,8 @@ pub struct Snapshot {
     pub captchas: Vec<CaptchaJob>,
     pub downloads: Vec<Package>,
     pub grabber: Vec<Package>,
+    /// Address the calls went to directly, bypassing the relay, if any.
+    pub direct: Option<String>,
 }
 
 impl Snapshot {
@@ -274,6 +277,20 @@ pub struct AddLinks {
 pub struct JdApi {
     myjd: MyJd,
     device_id: String,
+    /// When to look for a direct connection again; `None` right away.
+    next_probe: Option<Instant>,
+}
+
+/// How long a direct address gets to answer a ping.
+const PROBE_TIMEOUT: Duration = Duration::from_millis(1000);
+/// How long to stay on the relay after no direct address answered. The
+/// probe blocks the refresh for up to `PROBE_TIMEOUT`, so not too often.
+const PROBE_RETRY: Duration = Duration::from_secs(300);
+
+/// `host:port` as given in the config, with a scheme if it has none.
+fn base_url(address: &str) -> String {
+    let a = address.trim().trim_end_matches('/');
+    if a.contains("://") { a.to_string() } else { format!("http://{a}") }
 }
 
 fn opt(s: &str) -> Value {
@@ -282,7 +299,7 @@ fn opt(s: &str) -> Value {
 
 impl JdApi {
     pub fn new(myjd: MyJd, device_id: String) -> Self {
-        Self { myjd, device_id }
+        Self { myjd, device_id, next_probe: None }
     }
 
     pub fn list_devices(&mut self) -> Result<Vec<crate::myjd::Device>> {
@@ -298,6 +315,65 @@ impl JdApi {
     /// Point the same session at another JDownloader of the account.
     pub fn set_device(&mut self, device_id: String) {
         self.device_id = device_id;
+        self.myjd.set_direct(None);
+        self.next_probe = None;
+    }
+
+    /// The direct address in use, or none for the relay.
+    pub fn direct(&self) -> Option<&str> {
+        self.myjd.direct()
+    }
+
+    /// Keep the direct connection up: nothing to do while one is in use;
+    /// otherwise, at most every `PROBE_RETRY`, ping the addresses
+    /// JDownloader reports for itself plus `extra` (the ones only the user
+    /// knows, such as a Docker host) and take the fastest. Returns whether
+    /// calls go direct afterwards.
+    pub fn ensure_direct(&mut self, extra: &[String]) -> bool {
+        if self.myjd.direct().is_some() {
+            return true;
+        }
+        if self.next_probe.is_some_and(|t| Instant::now() < t) {
+            return false;
+        }
+        self.next_probe = Some(Instant::now() + PROBE_RETRY);
+        // JDownloader takes a second or two over this: it works out its
+        // own addresses on every call.
+        let mut candidates: Vec<String> = self.direct_connection_infos().unwrap_or_default();
+        candidates.extend(extra.iter().map(|a| base_url(a)));
+        candidates.dedup();
+        if candidates.is_empty() {
+            return false;
+        }
+        self.myjd.probe_direct(&self.device_id, &candidates, PROBE_TIMEOUT).is_some()
+    }
+
+    /// The addresses JDownloader believes it can be reached at, as base
+    /// urls. The payload is encrypted either way, so plain http will do;
+    /// the web interface only goes through https for the browser's sake.
+    fn direct_connection_infos(&mut self) -> Result<Vec<String>> {
+        #[derive(Deserialize)]
+        struct Info {
+            ip: String,
+            port: u16,
+        }
+        #[derive(Deserialize)]
+        struct Infos {
+            #[serde(default)]
+            infos: Vec<Info>,
+        }
+        let infos: Infos = self.call("/device/getDirectConnectionInfos", &[])?;
+        Ok(infos
+            .infos
+            .into_iter()
+            .map(|i| {
+                if i.ip.contains(':') {
+                    format!("http://[{}]:{}", i.ip.trim_matches(['[', ']']), i.port)
+                } else {
+                    format!("http://{}:{}", i.ip, i.port)
+                }
+            })
+            .collect())
     }
 
     /// One device call, with a single transparent reconnect when the session
@@ -317,7 +393,7 @@ impl JdApi {
         &mut self,
         path: &str,
         params: &[Value],
-        timeout: std::time::Duration,
+        timeout: Duration,
     ) -> Result<T> {
         match self.myjd.device_call_with_timeout(&self.device_id, path, params, Some(timeout)) {
             Err(e) if e.is_session_expired() => {
@@ -411,6 +487,7 @@ impl JdApi {
             captchas: status.captchas,
             downloads: self.downloads()?,
             grabber: self.grabber()?,
+            direct: self.myjd.direct().map(str::to_string),
         })
     }
 
@@ -647,7 +724,7 @@ impl JdApi {
     ];
 
     /// Poll timeout JDownloader applies to `listen`; its default.
-    pub const EVENT_POLL: std::time::Duration = std::time::Duration::from_secs(25);
+    pub const EVENT_POLL: Duration = Duration::from_secs(25);
 
     /// Open an event subscription; returns its id.
     pub fn subscribe_events(&mut self) -> Result<i64> {
@@ -661,7 +738,7 @@ impl JdApi {
 
     /// Block until events arrive or the poll timeout passes (then empty).
     pub fn listen_events(&mut self, subscription: i64) -> Result<Vec<Event>> {
-        self.call_long("/events/listen", &[json!(subscription)], Self::EVENT_POLL + std::time::Duration::from_secs(15))
+        self.call_long("/events/listen", &[json!(subscription)], Self::EVENT_POLL + Duration::from_secs(15))
     }
 
     pub fn unsubscribe_events(&mut self, subscription: i64) -> Result<()> {
@@ -791,7 +868,7 @@ mod live {
             if let Some(v) = f() {
                 return v;
             }
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            std::thread::sleep(Duration::from_millis(500));
         }
         panic!("timed out waiting for {what}");
     }
@@ -1021,5 +1098,37 @@ mod live {
         wait_for("our packages to disappear", || {
             api.grabber().ok()?.iter().all(|p| !p.name.starts_with("jdtui-reshape")).then_some(())
         });
+    }
+}
+
+#[cfg(test)]
+mod live_direct {
+    //! Against the real service: the direct connection must come up on one
+    //! of the addresses JDownloader reports and survive a device call.
+    use super::*;
+    use crate::myjd::MyJd;
+
+    #[test]
+    #[ignore]
+    fn direct_connection_comes_up_and_falls_back() {
+        let cfg = crate::config::Config::load().expect("config");
+        let mut myjd = MyJd::new(cfg.email.as_deref().unwrap(), cfg.password.as_deref().unwrap());
+        myjd.connect().expect("connect");
+        let mut api = JdApi::new(myjd, cfg.device.clone().expect("device"));
+        let extra = cfg.direct().unwrap_or_default();
+        let t = Instant::now();
+        let direct = api.ensure_direct(&extra);
+        println!("probe took {:?}: direct = {direct}, address = {:?}", t.elapsed(), api.direct());
+        for _ in 0..3 {
+            let t = Instant::now();
+            let state = api.state().expect("state");
+            println!("state {state} via {:?} in {:?}", api.direct().unwrap_or("relay"), t.elapsed());
+        }
+        // A dead address must drop back to the relay on the first call.
+        api.myjd.set_direct(Some("http://192.0.2.1:3129".into()));
+        let t = Instant::now();
+        let state = api.state().expect("state through the fallback");
+        println!("state {state} after fallback in {:?}, now via {:?}", t.elapsed(), api.direct().unwrap_or("relay"));
+        assert!(api.direct().is_none());
     }
 }

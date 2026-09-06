@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Direct connection: calls go straight to JDownloader when one of the
+  addresses it reports (or `direct_addresses` in the config) answers a
+  ping, and back through the relay when it stops answering. The header
+  shows `⇄ direct` or `☁ relay`. `direct = false` or `--no-direct` keeps
+  everything on the relay.
+
 ## 1.2.0 — 2026-09-04
 
 Live updates, video variants, and a few things the forms and lists were

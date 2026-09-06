@@ -373,9 +373,11 @@ impl App {
             email: self.config.email.clone().unwrap_or_default(),
             password: self.config.password.clone().unwrap_or_default(),
             device_id: device.id.clone(),
+            direct: self.config.direct(),
         });
         let api = Arc::new(Mutex::new(JdApi::new(myjd, device.id)));
-        self.poller = Some(Poller::start(api.clone(), Duration::from_millis(self.config.refresh_ms()), events));
+        let period = Duration::from_millis(self.config.refresh_ms());
+        self.poller = Some(Poller::start(api.clone(), period, events, self.config.direct()));
         self.api = Some(api);
         self.screen = Screen::Main;
     }

@@ -275,6 +275,14 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
     if app.events_live {
         state_line.push(Span::styled(" · live", Style::new().dim()));
     }
+    // How the calls reach JDownloader: straight to it, or through the
+    // My.JDownloader relay. Shown once the first snapshot is in.
+    if !app.snapshot.state.is_empty() {
+        match &app.snapshot.direct {
+            Some(_) => state_line.push(Span::styled(" · ⇄ direct", Style::new().fg(Color::Green).dim())),
+            None => state_line.push(Span::styled(" · ☁ relay", Style::new().dim())),
+        }
+    }
     // What is waiting on someone or something, next to the state.
     let captchas = app.snapshot.captchas.len();
     if captchas > 0 {

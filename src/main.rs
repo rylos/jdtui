@@ -29,6 +29,10 @@ struct Args {
     #[arg(long)]
     no_events: bool,
 
+    /// Always go through the My.JDownloader relay; never connect directly.
+    #[arg(long)]
+    no_direct: bool,
+
     /// Print the config file location and exit.
     #[arg(long)]
     config_path: bool,
@@ -50,6 +54,9 @@ fn main() -> Result<()> {
     }
     if args.no_events {
         config.events = Some(false);
+    }
+    if args.no_direct {
+        config.direct = Some(false);
     }
 
     let mut terminal = ratatui::init();

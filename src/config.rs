@@ -21,6 +21,14 @@ pub struct Config {
     /// Listen to JDownloader's event channel (default true): changes show
     /// up at once, and the refresh slows down while nothing downloads.
     pub events: Option<bool>,
+    /// Talk to JDownloader directly when one of the addresses it reports
+    /// answers (default true), as the web interface does; the relay is the
+    /// fallback either way.
+    pub direct: Option<bool>,
+    /// Addresses to try besides those JDownloader reports, `host:port`,
+    /// for a JDownloader that does not know how it is reached (a Docker
+    /// container sees its own address only).
+    pub direct_addresses: Option<Vec<String>>,
 }
 
 impl Config {
@@ -58,6 +66,12 @@ impl Config {
 
     pub fn events(&self) -> bool {
         self.events.unwrap_or(true)
+    }
+
+    /// The extra direct addresses to try, or none when direct connections
+    /// are off.
+    pub fn direct(&self) -> Option<Vec<String>> {
+        self.direct.unwrap_or(true).then(|| self.direct_addresses.clone().unwrap_or_default())
     }
 }
 

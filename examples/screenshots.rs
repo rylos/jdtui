@@ -295,6 +295,7 @@ fn demo() -> Snapshot {
         captchas: Vec::new(),
         downloads: vec![finished, running, queued],
         grabber: vec![grabbed],
+        direct: Some("http://192.168.1.20:3129".into()),
     }
 }
 

@@ -23,6 +23,8 @@ const API_URL: &str = "https://api.jdownloader.org";
 const APP_KEY: &str = "jdtui";
 const API_VERSION: u32 = 1;
 const CONTENT_TYPE: &str = "application/aesjson-jd; charset=utf-8";
+/// Timeout of an ordinary call over a direct connection.
+const DIRECT_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Same set Python's `urllib.parse.quote` leaves untouched, which is what the
 /// server signs against.
@@ -52,6 +54,13 @@ impl Error {
     /// Whether the session is gone and a reconnect is worth trying.
     pub fn is_session_expired(&self) -> bool {
         matches!(self, Error::Api { kind, .. } if kind == "TOKEN_INVALID" || kind == "SESSION_EXPIRED")
+    }
+
+    /// Whether the request never got a proper answer: connection refused,
+    /// timeout, garbage on the wire. On a direct connection that means the
+    /// route is gone, not that JDownloader refused the call.
+    pub fn is_transport(&self) -> bool {
+        matches!(self, Error::Transport(_))
     }
 }
 
@@ -129,6 +138,10 @@ pub struct MyJd {
     email: String,
     session: Option<Session>,
     last_rid: i64,
+    /// Base url of a direct connection to the current device, such as
+    /// `http://192.168.1.20:3129`; device calls go there instead of the
+    /// relay while it is set.
+    direct: Option<String>,
 }
 
 impl MyJd {
@@ -141,6 +154,7 @@ impl MyJd {
             email: email.to_string(),
             session: None,
             last_rid: 0,
+            direct: None,
         }
     }
 
@@ -215,25 +229,70 @@ impl MyJd {
             "rid": rid,
         });
         let encrypted = encrypt(&device_key, body.to_string().as_bytes());
-        let url = format!("{API_URL}/t_{session_token}_{device_id}{path}");
+        let tail = format!("/t_{session_token}_{device_id}{path}");
 
-        let mut request =
-            self.agent.post(&url).header("Content-Type", CONTENT_TYPE).config().http_status_as_error(false);
-        if let Some(t) = timeout {
-            request = request.timeout_global(Some(t));
+        if let Some(base) = self.direct.clone() {
+            // A direct route answers in milliseconds; when it does not,
+            // find out soon rather than after the relay's generous timeout.
+            let timeout = timeout.or(Some(DIRECT_TIMEOUT));
+            match post_device(&self.agent, &format!("{base}{tail}"), &encrypted, &device_key, rid, timeout) {
+                // The direct route is gone: back to the relay, for this
+                // call and the ones after it, until the next probe.
+                Err(e) if e.is_transport() => self.direct = None,
+                other => return other,
+            }
         }
-        let response = request.build().send(encrypted.as_bytes())?;
-        let status = response.status().as_u16();
-        let text = response.into_body().read_to_string()?;
-        if status != 200 {
-            return Err(parse_error(&text, Some(&device_key)));
-        }
-        let plain = decrypt(&device_key, &text)?;
-        let parsed: DeviceResponse<T> = serde_json::from_slice(&plain)?;
-        if parsed.rid != rid {
-            return Err(Error::Transport(format!("request id mismatch: sent {rid}, got {}", parsed.rid)));
-        }
-        Ok(parsed.data)
+        post_device(&self.agent, &format!("{API_URL}{tail}"), &encrypted, &device_key, rid, timeout)
+    }
+
+    /// Where device calls go: the direct address, or none for the relay.
+    pub fn direct(&self) -> Option<&str> {
+        self.direct.as_deref()
+    }
+
+    pub fn set_direct(&mut self, base: Option<String>) {
+        self.direct = base;
+    }
+
+    /// Try `candidates` (base urls) with a ping each, all at once, and keep
+    /// the fastest that answers as the direct route. This is what the web
+    /// interface does with the addresses `getDirectConnectionInfos`
+    /// reports. Returns the address chosen, if any.
+    pub fn probe_direct(&mut self, device_id: &str, candidates: &[String], timeout: Duration) -> Option<String> {
+        let (session_token, device_key) = match &self.session {
+            Some(s) => (s.session_token.clone(), s.device_key),
+            None => return None,
+        };
+        // Every ping needs a request id of its own, handed out here since
+        // the threads below cannot touch `self`.
+        let requests: Vec<(String, String, i64, String)> = candidates
+            .iter()
+            .map(|base| {
+                let rid = self.next_rid();
+                let body =
+                    serde_json::json!({ "apiVer": API_VERSION, "url": "/device/ping", "params": [], "rid": rid });
+                let url = format!("{base}/t_{session_token}_{device_id}/device/ping");
+                (base.clone(), url, rid, encrypt(&device_key, body.to_string().as_bytes()))
+            })
+            .collect();
+        let agent = &self.agent;
+        let fastest = std::thread::scope(|scope| {
+            let handles: Vec<_> = requests
+                .iter()
+                .map(|(base, url, rid, encrypted)| {
+                    scope.spawn(move || {
+                        let started = std::time::Instant::now();
+                        post_device::<bool>(agent, url, encrypted, &device_key, *rid, Some(timeout))
+                            .ok()
+                            .filter(|answered| *answered)
+                            .map(|_| (started.elapsed(), base.clone()))
+                    })
+                })
+                .collect();
+            handles.into_iter().filter_map(|h| h.join().ok().flatten()).min()
+        });
+        self.direct = fastest.map(|(_, base)| base);
+        self.direct.clone()
     }
 
     // --- internals -----------------------------------------------------
@@ -293,6 +352,33 @@ impl MyJd {
         let plain = decrypt(&key, &text)?;
         Ok(serde_json::from_slice(&plain)?)
     }
+}
+
+/// One encrypted device call to `url`, whatever host it points at.
+fn post_device<T: DeserializeOwned>(
+    agent: &ureq::Agent,
+    url: &str,
+    encrypted: &str,
+    device_key: &[u8; 32],
+    rid: i64,
+    timeout: Option<Duration>,
+) -> Result<T> {
+    let mut request = agent.post(url).header("Content-Type", CONTENT_TYPE).config().http_status_as_error(false);
+    if let Some(t) = timeout {
+        request = request.timeout_global(Some(t));
+    }
+    let response = request.build().send(encrypted.as_bytes())?;
+    let status = response.status().as_u16();
+    let text = response.into_body().read_to_string()?;
+    if status != 200 {
+        return Err(parse_error(&text, Some(device_key)));
+    }
+    let plain = decrypt(device_key, &text)?;
+    let parsed: DeviceResponse<T> = serde_json::from_slice(&plain)?;
+    if parsed.rid != rid {
+        return Err(Error::Transport(format!("request id mismatch: sent {rid}, got {}", parsed.rid)));
+    }
+    Ok(parsed.data)
 }
 
 fn parse_error(text: &str, device_key: Option<&[u8; 32]>) -> Error {

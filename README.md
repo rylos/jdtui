@@ -162,6 +162,11 @@ device = "…"
 refresh_ms = 1000
 # listen to JDownloader's event channel (default true); --no-events for one run
 events = true
+# connect to JDownloader directly when it can be reached (default true);
+# --no-direct for one run
+direct = true
+# addresses to try besides those JDownloader reports about itself, host:port
+direct_addresses = ["192.168.1.20:3129"]
 ```
 
 ## How it talks to JDownloader
@@ -170,6 +175,16 @@ The My.JDownloader protocol is implemented natively (`src/myjd.rs`): request ids
 HMAC-signed server calls, AES-CBC encrypted device calls, session and regain
 tokens. The unit tests pin the key derivation, signature and cipher output
 against the reference Python client, byte for byte.
+
+Calls go to JDownloader directly when they can, as in the web interface:
+jdtui asks JDownloader for the addresses it can be reached at (its "direct
+connection" setting, LAN or WAN), pings them all at once and keeps the
+fastest that answers. The payload is encrypted the same way either side of
+the relay, so nothing changes on the wire but the host. The header says
+`⇄ direct` or `☁ relay`; a direct route that stops answering falls back to
+the relay on the spot and is looked for again every five minutes. A
+JDownloader in a container only knows its own address, so `direct_addresses`
+in the config adds the ones it cannot see, such as the Docker host.
 
 Refreshes run on a background thread so the interface never waits on the
 network. A refresh is four round trips through the relay (state, speed, the two

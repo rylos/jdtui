@@ -42,7 +42,12 @@ pub struct EventSource {
     pub email: String,
     pub password: String,
     pub device_id: String,
+    pub direct: Direct,
 }
+
+/// Direct-connection settings: `None` keeps everything on the relay,
+/// otherwise the extra addresses to try besides those JDownloader reports.
+pub type Direct = Option<Vec<String>>;
 
 pub struct Poller {
     rx: Receiver<Update>,
@@ -53,7 +58,7 @@ pub struct Poller {
 }
 
 impl Poller {
-    pub fn start(api: SharedApi, period: Duration, events: Option<EventSource>) -> Self {
+    pub fn start(api: SharedApi, period: Duration, events: Option<EventSource>, direct: Direct) -> Self {
         let (tx, rx) = channel::<Update>();
         let (wake_tx, wake_rx) = channel::<()>();
         let stop = Arc::new(AtomicBool::new(false));
@@ -75,6 +80,9 @@ impl Poller {
             while !stop_flag.load(Ordering::Relaxed) {
                 let started = Instant::now();
                 let result = api.lock().map(|mut a| {
+                    if let Some(extra) = &direct {
+                        a.ensure_direct(extra);
+                    }
                     if woken || tick.is_multiple_of(STATUS_EVERY) {
                         status = a.status()?;
                     }
@@ -159,6 +167,9 @@ fn listen(
             }
         };
         api.set_device(device_id.clone());
+        if let Some(extra) = &source.direct {
+            api.ensure_direct(extra);
+        }
         let subscription = match api.subscribe_events() {
             Ok(id) => id,
             Err(_) => {
@@ -246,13 +257,14 @@ mod live {
             email: cfg.email.clone().unwrap(),
             password: cfg.password.clone().unwrap(),
             device_id: cfg.device.clone().unwrap(),
+            direct: cfg.direct(),
         };
         // Leftovers of an earlier run would confuse the counts below.
         let old: Vec<i64> = other.grabber().unwrap().iter().filter(|p| p.name == NAME).map(|p| p.uuid).collect();
         if !old.is_empty() {
             other.remove(&[], &old, true).expect("remove leftovers");
         }
-        let poller = Poller::start(api, Duration::from_secs(60), Some(source));
+        let poller = Poller::start(api, Duration::from_secs(60), Some(source), cfg.direct());
 
         // The channel and the first snapshot come up in either order.
         let (mut snapshot, mut channel) = (false, false);
