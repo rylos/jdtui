@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, BorderType, Cell, Clear, Paragraph, Row as TRow, T
 
 use crate::api::{Link, Package};
 use crate::app::{App, HELP, Mode, Screen};
-use crate::model::{FieldKind, Form, PRIORITIES, Row, Tab, describe, row_key, row_stop_marked};
+use crate::model::{FieldKind, Form, PRIORITIES, Row, Tab, describe, row_enabled, row_key, row_stop_marked};
 
 // --- palette ----------------------------------------------------------------
 //
@@ -515,7 +515,10 @@ fn draw_list(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn row_base_style(app: &App, packages: &[Package], row: &Row) -> Style {
-    if app.marked.contains(&row_key(packages, row)) { marked_style() } else { Style::new() }
+    let base = if app.marked.contains(&row_key(packages, row)) { marked_style() } else { Style::new() };
+    // A disabled row fades, as in the web interface: grey where the cells
+    // set no colour of their own, dimmed where they do.
+    if row_enabled(packages, row) { base } else { base.fg(Color::DarkGray).add_modifier(Modifier::DIM) }
 }
 
 fn mark(app: &App, packages: &[Package], row: &Row) -> &'static str {
@@ -604,6 +607,8 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
                                     "Finished".into()
                                 } else if link.running.unwrap_or(false) {
                                     "Downloading".into()
+                                } else if !link.is_enabled() {
+                                    "Disabled".into()
                                 } else {
                                     "-".into()
                                 }

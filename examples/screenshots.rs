@@ -239,6 +239,13 @@ fn demo() -> Snapshot {
                     i < 4,
                 )
             })
+            .chain(std::iter::once({
+                // A recovery volume: JDownloader adds it disabled.
+                let mut l = link(209, 2, "ubuntu-24.04.1.part1.rev", 0, 768 * 1024 * 1024, false);
+                l.enabled = None;
+                l.status = None;
+                l
+            }))
             .collect(),
         ..Default::default()
     };

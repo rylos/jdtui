@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Disabled packages and links are greyed out in both lists, as in the web
+  interface: the recovery volumes JDownloader adds disabled stand out from
+  what will download.
+
 ## 1.3.1 — 2026-09-06
 
 - The header shows an idle or stopped list in grey instead of red, and an

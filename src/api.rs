@@ -91,6 +91,9 @@ impl Package {
 }
 
 impl Link {
+    /// JDownloader leaves `enabled` out when it is false (a `.rev` volume
+    /// it added disabled has no `enabled` and no `status` at all), so a
+    /// missing value means disabled.
     pub fn is_enabled(&self) -> bool {
         self.enabled.unwrap_or(false)
     }
