@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.1 — 2026-09-06
+
+- The header shows an idle or stopped list in grey instead of red, and an
+  error in red instead of yellow: red now means trouble only.
+
 ## 1.3.0 — 2026-09-06
 
 - Direct connection: calls go straight to JDownloader when one of the

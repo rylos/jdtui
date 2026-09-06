@@ -254,12 +254,14 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
 
     let state = app.snapshot.state.as_str();
     let (state_text, state_color) = match (&app.refresh_error, state) {
-        (Some(e), _) => (format!("ERROR: {e}"), Color::Yellow),
+        // Red is for trouble only: an idle or stopped list is the normal
+        // state of affairs, not something to fix.
+        (Some(e), _) => (format!("ERROR: {e}"), Color::Red),
         (None, "") => ("CONNECTING…".to_string(), Color::Yellow),
         (None, "RUNNING") => (state.to_string(), Color::Green),
         (None, "PAUSE") => ("PAUSED".to_string(), Color::Yellow),
-        (None, "STOPPED_STATE") => ("STOPPED".to_string(), Color::Red),
-        (None, "IDLE") => (state.to_string(), Color::Red),
+        (None, "STOPPED_STATE") => ("STOPPED".to_string(), Color::DarkGray),
+        (None, "IDLE") => (state.to_string(), Color::DarkGray),
         (None, other) => (other.to_string(), Color::Yellow),
     };
 
