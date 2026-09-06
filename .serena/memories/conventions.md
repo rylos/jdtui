@@ -12,3 +12,10 @@
 - Tests: inline `mod tests` (offline: crypto fixtures, form editing, row filtering) and `mod live` (`#[ignore]`, real service) in api.rs, myjd.rs and poller.rs. Live helpers: `wait_for` (15 s), `wait_for_long` (2 min, for crawls). A failed live test leaves `jdtui-*` packages on the device: remove them before rerunning or the counts are off.
 - Commit messages: imperative English sentence, no prefix/scope; body only when a non-obvious decision needs explaining.
 - Never commit real credentials/device names; screenshot data is invented on purpose.
+
+## Interface decisions (2026-09-06)
+
+- Header colours: red means trouble only (ERROR); IDLE/STOPPED are DarkGray, PAUSED/STOPPING/CONNECTING yellow, RUNNING green. Border follows.
+- Keys: `p` pause/resume, `i` properties with `P` as alias (user asked to swap the old p/P; `i` chosen as the common TUI convention). Footer, HELP const, README table and screenshots must stay in sync.
+- Disabled rows (package or link) fade: row style DarkGray + DIM in `ui::row_base_style`; JD omits false booleans, so a missing `enabled` is disabled.
+- Announced on jlesage/docker-jdownloader-2 discussions #300 (Show and tell), 2026-09-06.

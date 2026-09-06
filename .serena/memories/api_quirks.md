@@ -22,3 +22,7 @@
 - User's setup: JD reports WAN 203.0.113.11:3129 (works from pc-work, ~120 ms = no gain vs relay); the real public IP 203.0.113.10:3129 works only from outside (no hairpin NAT); LAN 192.168.1.30:3129 gets a TCP reset before reaching the docker VM (something in front of it, not JD) — once opened, `direct_addresses = ["192.168.1.30:3129"]` gives ~3 ms calls.
 
 - queryLinks/queryPackages omit boolean fields that are false: a disabled link comes with no `enabled` key (and no `status`), so `Option<bool>` None must read as false (`is_enabled()` does).
+
+## Extraction (verified live 2026-09-06)
+
+- No `extraction` event publisher exists (`events/listpublisher`: captchas, downloadwatchdog, downloads, linkcollector, linkcrawler, dialogs). Extraction shows up only as `downloads.LINK_UPDATE.extractionStatus` (IDLE → null while running → SUCCESSFUL) and `extraction/getQueue` (no progress). The localized `status` text of package/link ("Estrazione OK: …") is the only place JD reports extraction progress; jdtui shows that text as-is, no extraction panel (decided not worth it).
