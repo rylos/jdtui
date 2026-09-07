@@ -583,14 +583,20 @@ fn status_span(packages: &[Package], row: &Row, extraction: Option<Extraction>) 
 /// reporting the package's own wait then, putting one on each of its
 /// links instead. Both were measured against the clock on a live
 /// extraction: the figure fell by about a thousand a second.
-fn eta_seconds(raw: i64, extracting: bool) -> i64 {
-    if extracting { raw / 1000 } else { raw }
+fn eta_seconds(raw: i64, extracting: bool, running: bool) -> i64 {
+    if extracting {
+        return raw / 1000;
+    }
+    // A row that is neither downloading nor being unpacked has no wait to
+    // report, and the figure it still carries would be read in the wrong
+    // unit: better nothing than "118h" for an archive with a minute to go.
+    if running { raw } else { 0 }
 }
 
 fn package_eta(package: &Package, extraction: Option<Extraction>) -> i64 {
     if extraction == Some(Extraction::Running) {
         let longest = package.links.iter().filter_map(|l| l.eta).max().unwrap_or(0);
-        return eta_seconds(longest, true);
+        return eta_seconds(longest, true, false);
     }
     package.eta.unwrap_or(0)
 }
@@ -693,7 +699,11 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
                             link.speed.filter(|s| *s > 0).map(|s| format!("{}/s", human_size(s))).unwrap_or_default(),
                         ),
                         Cell::from(Span::styled(
-                            human_eta(eta_seconds(link.eta.unwrap_or(0), extraction == Some(Extraction::Running))),
+                            human_eta(eta_seconds(
+                                link.eta.unwrap_or(0),
+                                extraction == Some(Extraction::Running),
+                                link.running.unwrap_or(false),
+                            )),
                             Style::new().dim(),
                         )),
                     ])
