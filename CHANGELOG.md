@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- jdtui answers questions in a script: `status`, `downloads`, `grabber`,
+  `devices`, `start`, `stop`, `pause`, `resume` and `add`, in text or with
+  `--json` for `jq`. `--device` picks the JDownloader. Suggested by the
+  JDownloader team.
 - A direct connection prefers IPv6 over IPv4 when both answer, since an
   IPv4 address is often behind carrier-grade NAT while IPv6 is native.
   Suggested by the JDownloader team.

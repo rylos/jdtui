@@ -176,6 +176,32 @@ free space of every path it can write to.
 | `?` | Show every key |
 | `q` | Quit |
 
+## In a script
+
+Given a command, jdtui answers it on stdout and exits instead of drawing:
+
+```bash
+jdtui status                    # what the download controller is doing
+jdtui downloads                 # the download list
+jdtui grabber                   # what is waiting to be confirmed
+jdtui devices                   # the JDownloaders on the account
+jdtui start | stop | pause | resume
+jdtui add https://example.com/file --package Ubuntu --folder /data --autostart
+cat urls.txt | jdtui add        # reads stdin when given no urls
+```
+
+`--json` prints the same thing as JSON, so the rest is `jq`:
+
+```bash
+jdtui status --json | jq -e .running >/dev/null && echo "busy"
+jdtui downloads --json | jq -r '.[] | select(.finished) | .name'
+```
+
+`--device` picks the JDownloader by name or id, whatever the config says.
+Nothing is ever asked interactively, so the account has to be in the config
+file already, which it is after the first run of the interface. A failure
+prints to stderr and exits non-zero.
+
 ## Config
 
 `~/.config/jdtui/config.toml` (print the exact path with `jdtui --config-path`).

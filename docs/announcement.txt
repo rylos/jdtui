@@ -48,6 +48,9 @@ split across a Downloads and a Link Grabber tab.
   colours follow the state as well, so a finished link and a downloading one
   no longer look alike
 - switch between the JDownloader instances on the account without restarting
+- given a command instead of nothing, it answers on stdout and exits, so it
+  fits in a script: status, downloads, grabber, devices, start/stop/pause,
+  add, with --json for jq
 - a single static binary, no runtime to install
 
 Install with a Rust toolchain:

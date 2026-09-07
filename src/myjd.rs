@@ -90,7 +90,7 @@ impl From<serde_json::Error> for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize)]
 pub struct Device {
     pub id: String,
     pub name: String,

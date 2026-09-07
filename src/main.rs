@@ -11,6 +11,7 @@ use ratatui::crossterm::event::{
 use ratatui::crossterm::execute;
 
 use jdtui::app::{App, Key};
+use jdtui::cli;
 use jdtui::config::Config;
 use jdtui::ui;
 
@@ -36,6 +37,19 @@ struct Args {
     /// Print the config file location and exit.
     #[arg(long)]
     config_path: bool,
+
+    /// With a command: print JSON on stdout instead of text.
+    #[arg(long, global = true)]
+    json: bool,
+
+    /// With a command: the JDownloader to talk to, by name or id.
+    #[arg(long, global = true)]
+    device: Option<String>,
+
+    /// Answer one question and exit, for scripts. Without one, jdtui
+    /// opens the interface.
+    #[command(subcommand)]
+    command: Option<cli::Command>,
 }
 
 fn main() -> Result<()> {
@@ -57,6 +71,10 @@ fn main() -> Result<()> {
     }
     if args.no_direct {
         config.direct = Some(false);
+    }
+
+    if let Some(command) = args.command {
+        return cli::run(command, &config, args.json, args.device.as_deref());
     }
 
     let mut terminal = ratatui::init();

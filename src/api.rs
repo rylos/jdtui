@@ -8,14 +8,14 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::myjd::{Error, MyJd, Result};
 
 pub type SharedApi = Arc<Mutex<JdApi>>;
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Package {
     pub uuid: i64,
@@ -40,7 +40,7 @@ pub struct Package {
     pub links: Vec<Link>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Link {
     pub uuid: i64,
@@ -201,7 +201,7 @@ pub struct FolderPolicy {
 }
 
 /// A mount point on the JDownloader machine.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct StorageInfo {
     pub path: Option<String>,
     pub free: Option<i64>,
@@ -209,7 +209,7 @@ pub struct StorageInfo {
 }
 
 /// What the machine running JDownloader says about itself.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemInfo {
     pub arch_string: Option<String>,
@@ -244,7 +244,7 @@ pub struct About {
 }
 
 /// One notification from the JDownloader event channel.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Event {
     pub eventid: String,
     pub publisher: String,
@@ -253,7 +253,7 @@ pub struct Event {
 }
 
 /// One of the forms a link can be downloaded in, such as a video quality.
-#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkVariant {
     pub id: Option<String>,
@@ -261,7 +261,7 @@ pub struct LinkVariant {
 }
 
 /// One archive in the extraction queue.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchiveStatus {
     pub archive_id: Option<String>,
@@ -279,7 +279,7 @@ pub struct ArchiveStatus {
 }
 
 /// A captcha JDownloader is waiting on.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptchaJob {
     pub id: i64,
@@ -293,7 +293,7 @@ pub struct CaptchaJob {
 }
 
 /// A premium (or free) account JDownloader knows about.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
     pub uuid: i64,
