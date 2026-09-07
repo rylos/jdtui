@@ -11,7 +11,7 @@
 - Errors: protocol layer returns `myjd::Result`; UI strings via `api::describe_error`; shown in footer `message: Option<(String, bool)>` (bool = is_error) or header `refresh_error`.
 - Tests: inline `mod tests` (offline: crypto fixtures, form editing, row filtering) and `mod live` (`#[ignore]`, real service) in api.rs, myjd.rs and poller.rs. Live helpers: `wait_for` (15 s), `wait_for_long` (2 min, for crawls). A failed live test leaves `jdtui-*` packages on the device: remove them before rerunning or the counts are off.
 - Commit messages: imperative English sentence, no prefix/scope; body only when a non-obvious decision needs explaining.
-- Never commit real credentials/device names; screenshot data is invented on purpose.
+- Never commit real credentials, hostnames, IP addresses or device names. THIS INCLUDES `.serena/memories/`: they are tracked and published with the repo. Anything about the user's own machines belongs in ~/.claude/CLAUDE.md instead. Screenshot data is invented on purpose.
 - Commits and tags are SSH-signed (repo-local git config, `~/.ssh/id_rsa`, allowed signers in `.github/allowed_signers`). Nothing to do per-commit; just do not turn it off.
 - Anything the panel shows must read in English whichever language JDownloader runs in: JD translates enum labels and its `status` sentence, so jdtui carries its own wording (`options.rs` for settings choices) and derives states from booleans/enums.
 

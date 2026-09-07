@@ -11,7 +11,7 @@ desktop GUI: packages with their links, split across a **Downloads** and a
 from anywhere the account does, with as many JDownloader instances as you have
 connected to it.
 
-![The download list](docs/downloads.png)
+![The download list](https://raw.githubusercontent.com/rylos/jdtui/main/docs/downloads.png)
 
 ## Install
 
@@ -102,7 +102,7 @@ alike whatever language they are written in.
 
 The footer lists the frequent keys; `?` opens the full reference.
 
-![The key reference](docs/help.png)
+![The key reference](https://raw.githubusercontent.com/rylos/jdtui/main/docs/help.png)
 
 ### Acting on packages and links
 
@@ -111,14 +111,14 @@ selection. Every entry acts on all marked rows at once, so a dozen links can be
 forced, resumed, reset, disabled, moved or removed in a single action.
 Destructive entries ask for confirmation first.
 
-![Acting on several links at once](docs/context-menu.png)
+![Acting on several links at once](https://raw.githubusercontent.com/rylos/jdtui/main/docs/context-menu.png)
 
 What the menu offers, depending on the tab and the selection:
 
 - **Force download**, **Resume**, **Unskip**, **Reset**, **Enable / Disable**
 - **Set priority…**, from highest to lowest
 
-  ![Choosing a priority](docs/priority.png)
+  ![Choosing a priority](https://raw.githubusercontent.com/rylos/jdtui/main/docs/priority.png)
 
 - **Rename…** a package or a link, **Set download folder…** for packages
 - **Move to new package…**, **Split by hoster**
@@ -136,7 +136,7 @@ on disk, the same three choices the desktop GUI offers: leave them, move them to
 the recycle bin, or delete them. The two that touch data ask again before
 running.
 
-![Choosing what happens to the files](docs/remove.png)
+![Choosing what happens to the files](https://raw.githubusercontent.com/rylos/jdtui/main/docs/remove.png)
 
 ### Adding links
 
@@ -153,9 +153,9 @@ the folders JDownloader used lately (the same list as the GUI's combo,
 lists and the mount points; pick one and edit it. The same picker serves the
 download-folder and new-package forms.
 
-![Picking a download folder](docs/folders.png)
+![Picking a download folder](https://raw.githubusercontent.com/rylos/jdtui/main/docs/folders.png)
 
-![Adding links](docs/add-links.png)
+![Adding links](https://raw.githubusercontent.com/rylos/jdtui/main/docs/add-links.png)
 
 The **Link Grabber** tab shows what is waiting to be confirmed, with the
 availability and hoster of every link, and says so while JDownloader is still
@@ -163,14 +163,14 @@ crawling what you added. `c` moves the whole list to the downloads, `C` clears
 it, `x` aborts the crawling. `e` adds a password to the list JDownloader tries
 on every archive.
 
-![The link grabber](docs/link-grabber.png)
+![The link grabber](https://raw.githubusercontent.com/rylos/jdtui/main/docs/link-grabber.png)
 
 ### Accounts
 
 `A` lists the premium accounts of the JDownloader with their traffic and
 expiry, and lets you enable, disable or refresh them.
 
-![The accounts panel](docs/accounts.png)
+![The accounts panel](https://raw.githubusercontent.com/rylos/jdtui/main/docs/accounts.png)
 
 ### Settings
 
@@ -194,7 +194,7 @@ toggle flips, a number or a path opens a field, a choice opens a list — and
 `r` puts it back to what JDownloader ships. Every change is written and then
 read back, so what you see is what JDownloader kept, not what was asked for.
 
-![The settings panel](docs/options.png)
+![The settings panel](https://raw.githubusercontent.com/rylos/jdtui/main/docs/options.png)
 
 For anything outside this list, use JDownloader's own settings; jdtui does not
 try to replace them.
@@ -206,7 +206,7 @@ updates, restart, reconnect for a new IP, exit. Installing an update is offered 
 when JDownloader reports one. Nothing that touches the host machine (shutdown,
 standby) is there.
 
-![The device menu](docs/device.png)
+![The device menu](https://raw.githubusercontent.com/rylos/jdtui/main/docs/device.png)
 
 Its first entry, **About**, describes that JDownloader and the machine under
 it: version and core revision, how long it has been up, whether an update is
@@ -215,7 +215,7 @@ system and architecture, whether it runs in a container, its Java and its
 heap, and the free space of every path it can write to. It answers the
 questions worth asking when something looks wrong.
 
-![What jdtui knows about the JDownloader](docs/about.png)
+![What jdtui knows about the JDownloader](https://raw.githubusercontent.com/rylos/jdtui/main/docs/about.png)
 
 ## Keys
 

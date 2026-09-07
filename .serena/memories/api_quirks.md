@@ -22,7 +22,7 @@
 
 - `device/getDirectConnectionInfos` (namespace `device`, not `jd`) → `{infos:[{ip,port}], mode: "LAN_WAN_MANUAL"|…, rebindProtectionDetected}`. Takes ~1.5 s on JD's side (it works out its addresses every call). A Docker JD lists only its container IP (may even be stale), 127.0.0.1 and the WAN IP it detects — not the Docker host's LAN IP.
 - Direct calls: same encrypted body, same `/t_<session>_<device>/path`, base `http://ip:port` (https works too; the web UI uses https via `<ip-with-dashes>.mydns.jdownloader.org` only for mixed-content reasons). The web UI (`https://my.jdownloader.org/jdapi/jdapi.min.js`, `_pingForAvailability`) pings all infos with `/device/ping` in parallel and keeps the fastest (`setLocalURL`); the icon is `isInLocalMode()`. jdtui: `MyJd::probe_direct` (scoped threads, `PROBE_TIMEOUT` 1 s), `JdApi::ensure_direct(extra)` from the poller (retry every `PROBE_RETRY` 5 min while on relay), transport error on a direct call → `direct = None` and the call is retried on the relay at once; `DIRECT_TIMEOUT` 5 s for direct calls without their own timeout.
-- User's setup: JD reports WAN 203.0.113.11:3129 (works from pc-work, ~120 ms = no gain vs relay); the real public IP 203.0.113.10:3129 works only from outside (no hairpin NAT); LAN 192.168.1.30:3129 gets a TCP reset before reaching the docker VM (something in front of it, not JD) — once opened, `direct_addresses = ["192.168.1.30:3129"]` gives ~3 ms calls.
+- Shape of a real setup (addresses redacted; this file is in a public repo): JD reports its WAN address, which from inside the same network is no faster than the relay; the public address works only from outside, since the router does no hairpin NAT; the LAN address of the Docker host is the one worth having (~3 ms vs ~115 ms) and JD cannot report it, so it has to come from `direct_addresses` in the config.
 
 - queryLinks/queryPackages omit boolean fields that are false: a disabled link comes with no `enabled` key (and no `status`), so `Option<bool>` None must read as false (`is_enabled()` does).
 
@@ -30,7 +30,7 @@
 
 - No `extraction` event publisher exists (`events/listpublisher`: captchas, downloadwatchdog, downloads, linkcollector, linkcrawler, dialogs). Extraction shows up only as `downloads.LINK_UPDATE.extractionStatus` (IDLE → null while running → SUCCESSFUL) and `extraction/getQueue` (no progress). The localized `status` text of package/link ("Estrazione OK: …") is the only place JD reports extraction progress; jdtui shows that text as-is, no extraction panel (decided not worth it).
 
-- 2026-09-07, jd2@docker: `getDirectConnectionInfos` now reports 172.17.0.8 (container), 127.0.0.1 and 203.0.113.10 (real public IP) — none reachable from pc-work (no route / no hairpin NAT), so the LAN address of the docker host must come from the config. `192.168.1.30:3129` works from pc-work (~4 ms vs ~115 ms relay); an earlier "reset" was a malformed probe of mine (path without the `/t_<session>_<device>` prefix — JD resets those), not a firewall.
+- A JDownloader in Docker reports its container address, 127.0.0.1 and the public address, and none of the three is reachable from another machine on the same LAN — hence the config key. An apparent TCP "reset" from JD's direct port is worth suspecting as a malformed probe before a firewall: JD resets a request whose path lacks the `/t_<session>_<device>` prefix.
 
 ## Extraction state, language-independent (verified live 2026-09-07)
 
