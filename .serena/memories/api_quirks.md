@@ -28,3 +28,10 @@
 - No `extraction` event publisher exists (`events/listpublisher`: captchas, downloadwatchdog, downloads, linkcollector, linkcrawler, dialogs). Extraction shows up only as `downloads.LINK_UPDATE.extractionStatus` (IDLE → null while running → SUCCESSFUL) and `extraction/getQueue` (no progress). The localized `status` text of package/link ("Estrazione OK: …") is the only place JD reports extraction progress; jdtui shows that text as-is, no extraction panel (decided not worth it).
 
 - 2026-09-07, jd2@docker: `getDirectConnectionInfos` now reports 172.17.0.8 (container), 127.0.0.1 and 203.0.113.10 (real public IP) — none reachable from pc-work (no route / no hairpin NAT), so the LAN address of the docker host must come from the config. `192.168.1.30:3129` works from pc-work (~4 ms vs ~115 ms relay); an earlier "reset" was a malformed probe of mine (path without the `/t_<session>_<device>` prefix — JD resets those), not a firewall.
+
+## Extraction state, language-independent (verified live 2026-09-07)
+
+- JD's `status` on package/link is a sentence in JD's own UI language ("Estrazione OK: film.part01.rar", "Entpacken (ETA: 41s)") — never parse it, never rely on it for a state.
+- `extraction/getArchiveInfo(linkIds, packageIds)` and `extraction/getQueue` return the same `ArchiveStatus`: `archiveId`, `archiveName` (base name, no `.partNN.rar`), `controllerId`, `controllerStatus` (`RUNNING`/`QUEUED` in the queue, `NA` otherwise), `type` (RAR_MULTI…), and **`states`: a map member-filename → COMPLETE/INCOMPLETE/MISSING**. Those keys are link names, which is how jdtui matches a queued archive to its package (`model::extraction_of`).
+- Per-link `extractionStatus` is language-independent: `SUCCESSFUL`, `ERROR*`, `IDLE`, or absent. It is the outcome of a finished run, so a package still downloading must not be called "Extracted" (jdtui gates that on `package.is_finished()`).
+- Still no extraction percentage anywhere in the structured API; the ETA exists only inside JD's localized sentence.
