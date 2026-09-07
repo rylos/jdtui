@@ -331,8 +331,14 @@ device = "…"
 refresh_ms = 1000
 # listen to JDownloader's event channel (default true); --no-events for one run
 events = true
-# connect straight to JDownloader when it answers (default true); --no-direct
+# talk to JDownloader directly when it answers (default true); --no-direct
 direct = true
+# a folder on this machine to watch for .crawljob files and containers
+watch_folder = "/home/you/jd-inbox"
+# stop watching it without forgetting the path (default true)
+watch = true
+# ask GitHub once a day whether a newer jdtui is out (default true)
+update_check = true
 
 # addresses JDownloader cannot report for itself, such as a container's host,
 # keyed by device name so each one is tried for the machine it belongs to
@@ -386,6 +392,18 @@ The images above are generated, not captured: `cargo run --example screenshots`
 draws the real interface into a test buffer and writes `docs/*.svg`, converting
 each to a PNG for this page. They cannot drift from the code, and the data in
 them is invented.
+
+## Building a release
+
+`.github/workflows/release.yml` runs on a pushed tag: format, clippy and the
+tests, then a build for each of the five targets, on a pinned toolchain so a
+release cannot start failing because a runner picked up a newer Rust. It
+creates the release from the tag's own message and uploads the archives with
+their `SHA256SUMS`.
+
+The signing key is not there. It stays on the maintainer's machine, and
+`scripts/sign-release.sh vX.Y.Z` downloads what the runners built, checks it
+against those checksums, signs it and uploads the signatures.
 
 ## Changelog
 
