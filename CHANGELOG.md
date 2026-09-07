@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- A direct connection prefers IPv6 over IPv4 when both answer, since an
+  IPv4 address is often behind carrier-grade NAT while IPv6 is native.
+  Suggested by the JDownloader team.
 - The device menu (`D`) opens an About panel: version and core revision,
   uptime, pending update, whether calls go direct or through the relay,
   the operating system, whether JDownloader runs in a container, its Java

@@ -215,7 +215,9 @@ against the reference Python client, byte for byte.
 Calls go to JDownloader directly when they can, as in the web interface:
 jdtui asks JDownloader for the addresses it can be reached at (its "direct
 connection" setting, LAN or WAN), pings them all at once and keeps the
-fastest that answers. The payload is encrypted the same way either side of
+best that answers: IPv6 before IPv4, then the quickest. IPv6 comes first not
+for speed but because an IPv4 address is often behind carrier-grade NAT,
+where the address JDownloader believes it has may not lead back to it. The payload is encrypted the same way either side of
 the relay, so nothing changes on the wire but the host. The header says
 `⇄ direct` or `☁ relay`; a direct route that stops answering falls back to
 the relay on the spot and is looked for again every five minutes. A

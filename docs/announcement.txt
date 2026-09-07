@@ -36,7 +36,7 @@ split across a Downloads and a Link Grabber tab.
   while nothing downloads
 - it talks to JDownloader directly whenever it can reach it, the way the web
   interface does: it asks JDownloader which addresses it answers on, pings
-  them all and keeps the fastest, and drops back to the relay by itself when
+  them all and keeps the best, IPv6 first, and drops back to the relay by itself when
   that route stops answering. On a LAN it turns a call of about 100 ms into
   one of about 5 ms, and the header says which route is in use. A JDownloader
   in a container only knows its own address, so extra ones can be named in

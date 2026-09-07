@@ -289,7 +289,7 @@ impl MyJd {
                     })
                 })
                 .collect();
-            handles.into_iter().filter_map(|h| h.join().ok().flatten()).min()
+            handles.into_iter().filter_map(|h| h.join().ok().flatten()).min_by_key(|(took, base)| rank(base, *took))
         });
         self.direct = fastest.map(|(_, base)| base);
         self.direct.clone()
@@ -352,6 +352,20 @@ impl MyJd {
         let plain = decrypt(&key, &text)?;
         Ok(serde_json::from_slice(&plain)?)
     }
+}
+
+/// How good a direct route is: IPv6 before IPv4, then the quickest to
+/// answer.
+///
+/// The order is not about speed. An IPv4 address is often behind
+/// carrier-grade NAT, where the address JDownloader believes it has is
+/// shared with other customers and may not lead back to it at all, while
+/// IPv6 is native and reaches the machine itself. Suggested by the
+/// JDownloader team.
+fn rank(base: &str, took: Duration) -> (u8, Duration) {
+    // Only an IPv6 authority is bracketed: http://[2001:db8::1]:3129
+    let ipv6 = base.contains('[');
+    (u8::from(!ipv6), took)
 }
 
 /// One encrypted device call to `url`, whatever host it points at.
@@ -487,6 +501,25 @@ mod tests {
         let bytes = [0u8, 1, 0xab, 0xff];
         assert_eq!(hex_encode(&bytes), "0001abff");
         assert_eq!(hex_decode("0001abff"), bytes);
+    }
+}
+
+#[cfg(test)]
+mod ranking {
+    use super::*;
+
+    #[test]
+    fn ipv6_wins_even_when_it_answers_later() {
+        let v6 = rank("http://[2001:db8::1]:3129", Duration::from_millis(80));
+        let v4 = rank("http://192.168.1.20:3129", Duration::from_millis(3));
+        assert!(v6 < v4, "IPv6 must be preferred: carrier-grade NAT often breaks the IPv4 route");
+    }
+
+    #[test]
+    fn within_a_family_the_quickest_wins() {
+        let near = rank("http://192.168.1.20:3129", Duration::from_millis(3));
+        let far = rank("http://203.0.113.7:3129", Duration::from_millis(120));
+        assert!(near < far);
     }
 }
 
