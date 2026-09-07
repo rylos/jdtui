@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `direct_addresses` can be keyed by device name, so an extra address is
+  tried for the JDownloader it belongs to and not for the others. A plain
+  list still serves every device.
+
 ## 1.3.2 — 2026-09-06
 
 - `p` pauses and resumes the downloads (was `P`); the properties of a row

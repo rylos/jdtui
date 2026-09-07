@@ -282,6 +282,11 @@ pub struct JdApi {
     device_id: String,
     /// When to look for a direct connection again; `None` right away.
     next_probe: Option<Instant>,
+    /// Whether to look for a direct connection at all.
+    direct_enabled: bool,
+    /// Addresses to try besides those JDownloader reports; they belong to
+    /// the current device only, so `set_device` drops them.
+    direct_extra: Vec<String>,
 }
 
 /// How long a direct address gets to answer a ping.
@@ -302,7 +307,7 @@ fn opt(s: &str) -> Value {
 
 impl JdApi {
     pub fn new(myjd: MyJd, device_id: String) -> Self {
-        Self { myjd, device_id, next_probe: None }
+        Self { myjd, device_id, next_probe: None, direct_enabled: true, direct_extra: Vec::new() }
     }
 
     pub fn list_devices(&mut self) -> Result<Vec<crate::myjd::Device>> {
@@ -320,6 +325,19 @@ impl JdApi {
         self.device_id = device_id;
         self.myjd.set_direct(None);
         self.next_probe = None;
+        // The extra addresses named a machine, not an account: they say
+        // nothing about the JDownloader we just moved to.
+        self.direct_extra.clear();
+    }
+
+    /// Whether to look for a direct connection, and the addresses to try
+    /// besides those this JDownloader reports about itself. Set it after
+    /// every `set_device`, which clears the addresses.
+    pub fn set_direct_config(&mut self, enabled: bool, extra: Vec<String>) {
+        self.direct_enabled = enabled;
+        self.direct_extra = extra;
+        self.myjd.set_direct(None);
+        self.next_probe = None;
     }
 
     /// The direct address in use, or none for the relay.
@@ -332,7 +350,10 @@ impl JdApi {
     /// JDownloader reports for itself plus `extra` (the ones only the user
     /// knows, such as a Docker host) and take the fastest. Returns whether
     /// calls go direct afterwards.
-    pub fn ensure_direct(&mut self, extra: &[String]) -> bool {
+    pub fn ensure_direct(&mut self) -> bool {
+        if !self.direct_enabled {
+            return false;
+        }
         if self.myjd.direct().is_some() {
             return true;
         }
@@ -343,7 +364,7 @@ impl JdApi {
         // JDownloader takes a second or two over this: it works out its
         // own addresses on every call.
         let mut candidates: Vec<String> = self.direct_connection_infos().unwrap_or_default();
-        candidates.extend(extra.iter().map(|a| base_url(a)));
+        candidates.extend(self.direct_extra.iter().map(|a| base_url(a)));
         candidates.dedup();
         if candidates.is_empty() {
             return false;
@@ -1118,9 +1139,9 @@ mod live_direct {
         let mut myjd = MyJd::new(cfg.email.as_deref().unwrap(), cfg.password.as_deref().unwrap());
         myjd.connect().expect("connect");
         let mut api = JdApi::new(myjd, cfg.device.clone().expect("device"));
-        let extra = cfg.direct().unwrap_or_default();
+        api.set_direct_config(true, cfg.direct_for("jd2@docker").unwrap_or_default());
         let t = Instant::now();
-        let direct = api.ensure_direct(&extra);
+        let direct = api.ensure_direct();
         println!("probe took {:?}: direct = {direct}, address = {:?}", t.elapsed(), api.direct());
         for _ in 0..3 {
             let t = Instant::now();

@@ -42,6 +42,7 @@ pub struct EventSource {
     pub email: String,
     pub password: String,
     pub device_id: String,
+    /// Extra direct addresses for `device_id`, `None` to stay on the relay.
     pub direct: Direct,
 }
 
@@ -53,19 +54,20 @@ pub struct Poller {
     rx: Receiver<Update>,
     wake: Sender<()>,
     stop: Arc<AtomicBool>,
-    /// Device switches for the listener; `None` without events.
-    device: Option<Sender<String>>,
+    /// Device switches for the listener, with that device's own direct
+    /// addresses; `None` without events.
+    device: Option<Sender<(String, Direct)>>,
 }
 
 impl Poller {
-    pub fn start(api: SharedApi, period: Duration, events: Option<EventSource>, direct: Direct) -> Self {
+    pub fn start(api: SharedApi, period: Duration, events: Option<EventSource>) -> Self {
         let (tx, rx) = channel::<Update>();
         let (wake_tx, wake_rx) = channel::<()>();
         let stop = Arc::new(AtomicBool::new(false));
         let events_alive = Arc::new(AtomicBool::new(false));
 
         let device = events.map(|source| {
-            let (device_tx, device_rx) = channel::<String>();
+            let (device_tx, device_rx) = channel::<(String, Direct)>();
             let (tx, wake, stop, alive) = (tx.clone(), wake_tx.clone(), stop.clone(), events_alive.clone());
             thread::spawn(move || listen(source, device_rx, tx, wake, stop, alive));
             device_tx
@@ -80,9 +82,9 @@ impl Poller {
             while !stop_flag.load(Ordering::Relaxed) {
                 let started = Instant::now();
                 let result = api.lock().map(|mut a| {
-                    if let Some(extra) = &direct {
-                        a.ensure_direct(extra);
-                    }
+                    // The api knows whether it wants a direct connection
+                    // and which addresses belong to its device.
+                    a.ensure_direct();
                     if woken || tick.is_multiple_of(STATUS_EVERY) {
                         status = a.status()?;
                     }
@@ -125,10 +127,11 @@ impl Poller {
         let _ = self.wake.send(());
     }
 
-    /// Point the event listener at another JDownloader of the account.
-    pub fn set_device(&self, device_id: String) {
+    /// Point the event listener at another JDownloader of the account,
+    /// with the direct addresses of that one.
+    pub fn set_device(&self, device_id: String, direct: Direct) {
         if let Some(d) = &self.device {
-            let _ = d.send(device_id);
+            let _ = d.send((device_id, direct));
         }
     }
 }
@@ -145,13 +148,14 @@ impl Drop for Poller {
 /// and reopens it after a pause; a device switch resubscribes there.
 fn listen(
     source: EventSource,
-    device_rx: Receiver<String>,
+    device_rx: Receiver<(String, Direct)>,
     tx: Sender<Update>,
     wake: Sender<()>,
     stop: Arc<AtomicBool>,
     alive: Arc<AtomicBool>,
 ) {
     let mut device_id = source.device_id;
+    let mut direct = source.direct;
     let mut api: Option<JdApi> = None;
     while !stop.load(Ordering::Relaxed) {
         // A session of its own, reused across resubscriptions.
@@ -167,9 +171,8 @@ fn listen(
             }
         };
         api.set_device(device_id.clone());
-        if let Some(extra) = &source.direct {
-            api.ensure_direct(extra);
-        }
+        api.set_direct_config(direct.is_some(), direct.clone().unwrap_or_default());
+        api.ensure_direct();
         let subscription = match api.subscribe_events() {
             Ok(id) => id,
             Err(_) => {
@@ -184,8 +187,9 @@ fn listen(
             if stop.load(Ordering::Relaxed) {
                 break false;
             }
-            if let Ok(id) = device_rx.try_recv() {
+            if let Ok((id, addresses)) = device_rx.try_recv() {
                 device_id = id;
+                direct = addresses;
                 let _ = api.unsubscribe_events(subscription);
                 break false;
             }
@@ -257,14 +261,14 @@ mod live {
             email: cfg.email.clone().unwrap(),
             password: cfg.password.clone().unwrap(),
             device_id: cfg.device.clone().unwrap(),
-            direct: cfg.direct(),
+            direct: cfg.direct_for("jd2@docker"),
         };
         // Leftovers of an earlier run would confuse the counts below.
         let old: Vec<i64> = other.grabber().unwrap().iter().filter(|p| p.name == NAME).map(|p| p.uuid).collect();
         if !old.is_empty() {
             other.remove(&[], &old, true).expect("remove leftovers");
         }
-        let poller = Poller::start(api, Duration::from_secs(60), Some(source), cfg.direct());
+        let poller = Poller::start(api, Duration::from_secs(60), Some(source));
 
         // The channel and the first snapshot come up in either order.
         let (mut snapshot, mut channel) = (false, false);
@@ -303,7 +307,7 @@ mod live {
 
         // Switching device resubscribes: the channel drops and comes back,
         // and still wakes the refresh afterwards.
-        poller.set_device(cfg.device.clone().unwrap());
+        poller.set_device(cfg.device.clone().unwrap(), cfg.direct_for("jd2@docker"));
         wait_for(&poller, "the channel to drop", 40, |u| matches!(u, Update::Events(false)).then_some(()));
         wait_for(&poller, "the channel to come back", 40, |u| matches!(u, Update::Events(true)).then_some(()));
         println!("channel back after the device switch");

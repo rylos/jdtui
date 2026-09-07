@@ -26,3 +26,5 @@
 ## Extraction (verified live 2026-09-06)
 
 - No `extraction` event publisher exists (`events/listpublisher`: captchas, downloadwatchdog, downloads, linkcollector, linkcrawler, dialogs). Extraction shows up only as `downloads.LINK_UPDATE.extractionStatus` (IDLE → null while running → SUCCESSFUL) and `extraction/getQueue` (no progress). The localized `status` text of package/link ("Estrazione OK: …") is the only place JD reports extraction progress; jdtui shows that text as-is, no extraction panel (decided not worth it).
+
+- 2026-09-07, jd2@docker: `getDirectConnectionInfos` now reports 172.17.0.8 (container), 127.0.0.1 and 203.0.113.10 (real public IP) — none reachable from pc-work (no route / no hairpin NAT), so the LAN address of the docker host must come from the config. `192.168.1.30:3129` works from pc-work (~4 ms vs ~115 ms relay); an earlier "reset" was a malformed probe of mine (path without the `/t_<session>_<device>` prefix — JD resets those), not a firewall.

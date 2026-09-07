@@ -165,8 +165,13 @@ events = true
 # connect to JDownloader directly when it can be reached (default true);
 # --no-direct for one run
 direct = true
-# addresses to try besides those JDownloader reports about itself, host:port
-direct_addresses = ["192.168.1.20:3129"]
+# addresses to try besides those JDownloader reports about itself, host:port.
+# With one JDownloader a plain list will do:
+#   direct_addresses = ["192.168.1.20:3129"]
+# With several, key them by device name so an address is tried for the
+# machine it belongs to and no other:
+[direct_addresses]
+"jd2@home" = ["192.168.1.20:3129"]
 ```
 
 ## How it talks to JDownloader
@@ -184,7 +189,9 @@ the relay, so nothing changes on the wire but the host. The header says
 `⇄ direct` or `☁ relay`; a direct route that stops answering falls back to
 the relay on the spot and is looked for again every five minutes. A
 JDownloader in a container only knows its own address, so `direct_addresses`
-in the config adds the ones it cannot see, such as the Docker host.
+in the config adds the ones it cannot see, such as the Docker host; keyed by
+device name when the account has several, since an address belongs to one
+machine.
 
 Refreshes run on a background thread so the interface never waits on the
 network. A refresh is four round trips through the relay (state, speed, the two

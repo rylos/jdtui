@@ -349,10 +349,12 @@ impl App {
         let _ = self.config.save();
         self.device_name = device.name.clone();
 
+        let direct = self.config.direct_for(&device.name);
         if let Some(api) = &self.api {
             // Switching from the main screen: keep the session, swap the target.
             if let Ok(mut a) = api.lock() {
                 a.set_device(device.id.clone());
+                a.set_direct_config(direct.is_some(), direct.clone().unwrap_or_default());
             }
             self.snapshot = Snapshot::default();
             self.rows.clear();
@@ -361,7 +363,7 @@ impl App {
             self.marked.clear();
             self.mode = Mode::List;
             if let Some(p) = &self.poller {
-                p.set_device(device.id);
+                p.set_device(device.id, direct);
                 p.refresh_now();
             }
             self.screen = Screen::Main;
@@ -373,11 +375,13 @@ impl App {
             email: self.config.email.clone().unwrap_or_default(),
             password: self.config.password.clone().unwrap_or_default(),
             device_id: device.id.clone(),
-            direct: self.config.direct(),
+            direct: direct.clone(),
         });
-        let api = Arc::new(Mutex::new(JdApi::new(myjd, device.id)));
+        let mut jd = JdApi::new(myjd, device.id);
+        jd.set_direct_config(direct.is_some(), direct.unwrap_or_default());
+        let api = Arc::new(Mutex::new(jd));
         let period = Duration::from_millis(self.config.refresh_ms());
-        self.poller = Some(Poller::start(api.clone(), period, events, self.config.direct()));
+        self.poller = Some(Poller::start(api.clone(), period, events));
         self.api = Some(api);
         self.screen = Screen::Main;
     }
