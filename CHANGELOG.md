@@ -11,6 +11,8 @@
   containers, filing each away afterwards. JDownloader cannot watch a
   folder it has no access to; this covers that. Suggested by the
   JDownloader team.
+- `jdtui status` names the JDownloader that answered, which an account
+  with more than one needs.
 - jdtui answers questions in a script: `status`, `downloads`, `grabber`,
   `devices`, `start`, `stop`, `pause`, `resume` and `add`, in text or with
   `--json` for `jq`. `--device` picks the JDownloader. Suggested by the

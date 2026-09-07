@@ -17,7 +17,7 @@ use serde::Serialize;
 
 use crate::api::{AddLinks, JdApi, Package, Snapshot};
 use crate::config::Config;
-use crate::myjd::MyJd;
+use crate::myjd::{Device, MyJd};
 use crate::watch;
 
 #[derive(Subcommand, Debug)]
@@ -79,6 +79,9 @@ pub enum Command {
 /// be read by `jq` and by people in equal measure.
 #[derive(Serialize)]
 struct Status {
+    /// Which JDownloader answered, since an account can have several.
+    device: String,
+    device_id: String,
     /// As JDownloader names it: IDLE, RUNNING, PAUSE, STOPPING,
     /// STOPPED_STATE.
     state: String,
@@ -104,8 +107,10 @@ struct Status {
 }
 
 impl Status {
-    fn of(snapshot: &Snapshot, direct: Option<String>) -> Self {
+    fn of(device: &Device, snapshot: &Snapshot, direct: Option<String>) -> Self {
         Status {
+            device: device.name.clone(),
+            device_id: device.id.clone(),
             state: snapshot.state.clone(),
             running: snapshot.is_running(),
             paused: snapshot.is_paused(),
@@ -124,6 +129,7 @@ impl Status {
     }
 
     fn print(&self) {
+        println!("Device     {}", self.device);
         println!("State      {}", self.state);
         println!("Speed      {}/s", crate::ui::human_size(self.speed));
         println!("Packages   {} ({} running, {} done)", self.packages, self.packages_running, self.packages_finished);
@@ -181,13 +187,13 @@ pub fn run(command: Command, config: &Config, json: bool, device: Option<&str>) 
         return Ok(());
     }
 
-    let mut api = connect(config, device)?;
+    let (mut api, device) = connect(config, device)?;
     match command {
         Command::Devices => unreachable!("handled above"),
         Command::Status => {
             let status = api.status().context("reading what JDownloader is busy with")?;
             let snapshot = api.snapshot(status).context("reading the lists")?;
-            let status = Status::of(&snapshot, api.direct().map(str::to_string));
+            let status = Status::of(&device, &snapshot, api.direct().map(str::to_string));
             if json {
                 println!("{}", serde_json::to_string_pretty(&status)?);
             } else {
@@ -319,7 +325,7 @@ fn sign_in(config: &Config) -> Result<MyJd> {
 /// Sign in and pick the JDownloader to talk to: the one named on the
 /// command line, else the one saved in the config, else the only one there
 /// is.
-fn connect(config: &Config, wanted: Option<&str>) -> Result<JdApi> {
+fn connect(config: &Config, wanted: Option<&str>) -> Result<(JdApi, Device)> {
     let mut jd = sign_in(config)?;
     let devices = jd.list_devices().context("listing the JDownloaders of the account")?;
     if devices.is_empty() {
@@ -344,10 +350,10 @@ fn connect(config: &Config, wanted: Option<&str>) -> Result<JdApi> {
         },
     };
     let direct = config.direct_for(&chosen.name);
-    let mut api = JdApi::new(jd, chosen.id);
+    let mut api = JdApi::new(jd, chosen.id.clone());
     api.set_direct_config(direct.is_some(), direct.unwrap_or_default());
     api.ensure_direct();
-    Ok(api)
+    Ok((api, chosen))
 }
 
 #[cfg(test)]
@@ -378,7 +384,8 @@ mod tests {
             extracting: vec![ArchiveStatus::default()],
             ..Default::default()
         };
-        let status = Status::of(&snapshot, Some("http://192.168.1.30:3129".into()));
+        let device = Device { id: "abc".into(), name: "jd2@test".into(), kind: "jd".into() };
+        let status = Status::of(&device, &snapshot, Some("http://192.168.1.30:3129".into()));
         assert!(status.running);
         assert!(!status.paused);
         assert_eq!(status.packages, 2);
@@ -391,6 +398,7 @@ mod tests {
 
         // The shape scripts read must not drift.
         let json = serde_json::to_value(&status).expect("json");
+        assert_eq!(json["device"], "jd2@test");
         assert_eq!(json["state"], "RUNNING");
         assert_eq!(json["running"], true);
         assert_eq!(json["direct"], "http://192.168.1.30:3129");
@@ -399,7 +407,8 @@ mod tests {
     #[test]
     fn a_paused_controller_still_counts_as_running() {
         let snapshot = Snapshot { state: "PAUSE".into(), ..Default::default() };
-        let status = Status::of(&snapshot, None);
+        let device = Device { id: "abc".into(), name: "jd2@test".into(), kind: "jd".into() };
+        let status = Status::of(&device, &snapshot, None);
         assert!(status.running, "JDownloader keeps the queue while paused");
         assert!(status.paused);
         assert!(status.direct.is_none());

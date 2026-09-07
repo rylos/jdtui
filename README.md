@@ -193,6 +193,7 @@ cat urls.txt | jdtui add        # reads stdin when given no urls
 `--json` prints the same thing as JSON, so the rest is `jq`:
 
 ```bash
+jdtui status --json | jq -r '"\(.device): \(.state)"'
 jdtui status --json | jq -e .running >/dev/null && echo "busy"
 jdtui downloads --json | jq -r '.[] | select(.finished) | .name'
 ```
