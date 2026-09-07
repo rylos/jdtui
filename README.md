@@ -22,7 +22,7 @@ Windows, on Intel and ARM — put it somewhere on your `PATH`, and run it.
 Or build it yourself:
 
 ```bash
-cargo install --git https://github.com/rylos/jdtui
+cargo install jdtui
 ```
 
 Either way it is a single binary: no runtime, no Python, no local API to
