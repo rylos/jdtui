@@ -1249,9 +1249,9 @@ fn draw_accounts(frame: &mut Frame, app: &App, area: Rect) {
 /// ever lands on something that can be changed.
 fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
     let hint = "Enter change · r default · ↑↓ move · Esc close";
-    let width = area.width.saturating_sub(6).min(96);
+    let room = area.width.saturating_sub(6);
     if app.options.is_empty() {
-        let popup = centered(area, width, 3);
+        let popup = centered(area, room.min(60), 3);
         frame.render_widget(Clear, popup);
         let block = panel("Settings", Some(hint));
         let inner = block.inner(popup);
@@ -1266,10 +1266,17 @@ fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
     // The note of the highlighted setting sits at the foot of the panel, so
     // the list above it is two lines shorter.
     let note_height = 2u16;
-    let label_width = 34usize;
-    // The value gets whatever the label leaves, less the borders, the cursor
-    // column, the padding and the room a `·` needs.
-    let value_width = (width as usize).saturating_sub(label_width + 12).max(12);
+    let label_width = 32usize;
+    // Everything a row spends besides the value: the borders, the cursor
+    // column, the label, the room a `·` needs and the padded right edge.
+    let furniture = label_width + 12;
+
+    // Widen the panel until the longest value fits, rather than cutting the
+    // wording JDownloader chose. The hint under the panel sets the floor.
+    let values: Vec<String> = app.options.iter().map(|s| s.shown(&app.option_enums)).collect();
+    let widest = values.iter().map(|v| v.chars().count()).max().unwrap_or(0);
+    let width = ((widest + furniture) as u16).clamp(hint.chars().count() as u16 + 4, room);
+    let value_width = (width as usize).saturating_sub(furniture).max(12);
 
     let mut lines: Vec<Line> = Vec::new();
     // Which setting each line belongs to; headings belong to none.
@@ -1286,7 +1293,7 @@ fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
             owner.push(None);
         }
         let selected = i == app.option_index;
-        let value = setting.shown(&app.option_enums);
+        let value = &values[i];
         let value_style = match setting.edit() {
             crate::options::Edit::Toggle if value == "on" => Style::new().fg(Color::Green),
             crate::options::Edit::Toggle => Style::new().fg(Color::DarkGray),
@@ -1296,7 +1303,7 @@ fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
         let mut spans = vec![
             Span::raw(format!("  {} ", if selected { "›" } else { " " })),
             Span::raw(format!("{:<label_width$}", truncate(setting.spec.label, label_width))),
-            Span::styled(truncate(&value, value_width), value_style),
+            Span::styled(truncate(value, value_width), value_style),
         ];
         if !setting.is_default() {
             spans.push(Span::styled("  ·", Style::new().dim()));
@@ -1527,6 +1534,23 @@ mod tests {
         // One heading and one row per section, plus blanks, the note and the
         // borders: comfortably under twenty on this sample.
         assert!(bottom - top < 20, "the panel spans {} rows on a 60-row terminal", bottom - top);
+    }
+
+    #[test]
+    fn a_long_value_widens_the_panel_instead_of_being_cut() {
+        use crate::api::ConfigEntry;
+        let long = "Avvio automatico: modalità automatica (impostazioni rapide)";
+        let mut app = App::with_snapshot(sample());
+        app.options = crate::options::collect(vec![ConfigEntry {
+            interface_name: "org.jdownloader.settings.GeneralSettings".into(),
+            key: "DefaultDownloadFolder".into(),
+            abstract_type: Some("STRING".into()),
+            value: Some(serde_json::json!(long)),
+            default_value: Some(serde_json::json!(long)),
+            ..Default::default()
+        }]);
+        app.mode = crate::app::Mode::Options;
+        assert!(shows(&app, long), "the whole value must be readable on a wide terminal");
     }
 
     #[test]
