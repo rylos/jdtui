@@ -8,7 +8,9 @@ use ratatui::widgets::{Block, BorderType, Cell, Clear, Paragraph, Row as TRow, T
 
 use crate::api::{Link, Package};
 use crate::app::{App, HELP, Mode, Screen};
-use crate::model::{FieldKind, Form, PRIORITIES, Row, Tab, describe, row_enabled, row_key, row_stop_marked};
+use crate::model::{
+    Extraction, FieldKind, Form, PRIORITIES, Row, Tab, describe, extraction_of, row_enabled, row_key, row_stop_marked,
+};
 
 // --- palette ----------------------------------------------------------------
 //
@@ -272,7 +274,9 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let cols = Layout::horizontal([Constraint::Ratio(1, 3); 3]).split(inner);
+    // The state line carries the most: the controller, the event channel,
+    // how the calls travel and anything waiting on someone.
+    let cols = Layout::horizontal([Constraint::Fill(3), Constraint::Fill(2), Constraint::Fill(2)]).split(inner);
     let mut state_line = vec![Span::raw("State: "), Span::styled(state_text, Style::new().fg(state_color).bold())];
     if app.events_live {
         state_line.push(Span::styled(" · live", Style::new().dim()));
@@ -534,17 +538,53 @@ fn stop_mark(app: &App, packages: &[Package], row: &Row) -> Span<'static> {
     }
 }
 
+/// The Status cell of a row. An archive jdtui can name itself wins over
+/// JDownloader's own sentence, which is written in its language and is
+/// usually too long for the column.
+fn status_span(app: &App, packages: &[Package], row: &Row) -> Span<'static> {
+    if let Some(state) = extraction_of(packages, row, &app.snapshot.extracting) {
+        let style = match state {
+            Extraction::Running => Style::new().fg(Color::Yellow).bold(),
+            Extraction::Queued => Style::new().fg(Color::Yellow).dim(),
+            Extraction::Done => Style::new().fg(Color::Green),
+            Extraction::Failed => Style::new().fg(Color::Red).bold(),
+        };
+        return Span::styled(state.label(), style);
+    }
+    let package = &packages[row.package];
+    match row.link {
+        None => Span::styled(package_status(package), Style::new().fg(Color::Yellow)),
+        Some(l) => {
+            let link = &package.links[l];
+            let text = link.status.clone().unwrap_or_else(|| {
+                if link.is_finished() {
+                    "Finished".into()
+                } else if link.running.unwrap_or(false) {
+                    "Downloading".into()
+                } else if !link.is_enabled() {
+                    "Disabled".into()
+                } else {
+                    "-".into()
+                }
+            });
+            Span::styled(text, Style::new().dim())
+        }
+    }
+}
+
 fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static str>, Vec<Constraint>, Vec<TRow<'a>>) {
     let header = vec!["Name", "Links", "Size", "Status", "Progress", "%", "Speed", "ETA"];
+    // Status carries sentences JDownloader wrote, so it gets a share of
+    // its own rather than what is left over.
     let widths = vec![
         Constraint::Fill(3),
         Constraint::Length(6),
         Constraint::Length(20),
-        Constraint::Fill(1),
+        Constraint::Fill(2),
         Constraint::Length(18),
         Constraint::Length(5),
-        Constraint::Length(12),
-        Constraint::Length(9),
+        Constraint::Length(11),
+        Constraint::Length(8),
     ];
     let rows = app
         .rows
@@ -570,7 +610,7 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
                             ),
                             Style::new().dim(),
                         )),
-                        Cell::from(Span::styled(package_status(pkg), Style::new().fg(Color::Yellow))),
+                        Cell::from(status_span(app, packages, row)),
                         Cell::from(progress_bar(pct, 18)),
                         Cell::from(format!("{pct:.0}%")),
                         Cell::from(Span::styled(
@@ -601,20 +641,7 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
                             ),
                             Style::new().dim(),
                         )),
-                        Cell::from(Span::styled(
-                            link.status.clone().unwrap_or_else(|| {
-                                if link.is_finished() {
-                                    "Finished".into()
-                                } else if link.running.unwrap_or(false) {
-                                    "Downloading".into()
-                                } else if !link.is_enabled() {
-                                    "Disabled".into()
-                                } else {
-                                    "-".into()
-                                }
-                            }),
-                            Style::new().dim(),
-                        )),
+                        Cell::from(status_span(app, packages, row)),
                         Cell::from(""),
                         Cell::from(Span::styled(format!("{pct:.0}%"), Style::new().dim())),
                         Cell::from(

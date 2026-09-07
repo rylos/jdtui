@@ -4,6 +4,7 @@
 //! only returns when asked for or when it has a value (a disabled link, for
 //! instance, simply omits `enabled`).
 
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -229,10 +230,17 @@ pub struct LinkVariant {
 #[serde(rename_all = "camelCase")]
 pub struct ArchiveStatus {
     pub archive_id: Option<String>,
+    /// The archive without its volume suffix, `video.part01.rar` filed
+    /// under `video`.
     pub archive_name: Option<String>,
     pub controller_id: Option<i64>,
-    /// `RUNNING` or `QUEUED`.
+    /// `RUNNING` or `QUEUED` while it is in the queue, `NA` otherwise.
     pub controller_status: Option<String>,
+    /// The files the archive is made of, each `COMPLETE`, `INCOMPLETE` or
+    /// `MISSING`. These are link names, which is how an archive in the
+    /// queue is matched to the package it belongs to.
+    #[serde(default)]
+    pub states: BTreeMap<String, String>,
 }
 
 /// A captcha JDownloader is waiting on.

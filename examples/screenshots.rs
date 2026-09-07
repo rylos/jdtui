@@ -184,8 +184,7 @@ fn link(uuid: i64, package: i64, name: &str, loaded: i64, total: i64, done: bool
         finished: Some(done),
         host: Some("mirror.example.org".into()),
         url: Some(format!("https://mirror.example.org/{name}")),
-        status: Some(if done { "Extraction OK".into() } else { "Downloading".into() }),
-        extraction_status: done.then(|| "SUCCESSFUL".to_string()),
+        status: Some(if done { "Finished".into() } else { "Downloading".into() }),
         ..Default::default()
     }
 }
@@ -205,14 +204,16 @@ fn demo() -> Snapshot {
         status: Some("Extraction OK".into()),
         links: (0..24)
             .map(|i| {
-                link(
+                let mut l = link(
                     100 + i,
                     1,
                     &format!("blender-demo.part{:02}.rar", i + 1),
                     512 * 1024 * 1024,
                     512 * 1024 * 1024,
                     true,
-                )
+                );
+                l.extraction_status = Some("SUCCESSFUL".into());
+                l
             })
             .collect(),
         ..Default::default()
@@ -262,6 +263,36 @@ fn demo() -> Snapshot {
             .collect(),
         ..Default::default()
     };
+    // Finished downloading, JDownloader is unpacking it. Its own status
+    // sentence is written in its language; jdtui works the state out from
+    // the extraction queue instead, so this never reaches the screen.
+    let unpacking = Package {
+        uuid: 5,
+        name: "Fedora 41 Workstation".into(),
+        bytes_loaded: Some(5 * GB),
+        bytes_total: Some(5 * GB),
+        child_count: Some(10),
+        enabled: Some(true),
+        finished: Some(true),
+        save_to: Some("/downloads/Fedora 41".into()),
+        status: Some("Entpacken (ETA: 41s)".into()),
+        links: (0..10)
+            .map(|i| {
+                let mut l = link(
+                    400 + i,
+                    5,
+                    &format!("fedora-41.part{:02}.rar", i + 1),
+                    512 * 1024 * 1024,
+                    512 * 1024 * 1024,
+                    true,
+                );
+                l.status = None;
+                l.extraction_status = None;
+                l
+            })
+            .collect(),
+        ..Default::default()
+    };
     let grabbed = Package {
         uuid: 4,
         name: "LibreOffice 25.2 sources".into(),
@@ -295,12 +326,13 @@ fn demo() -> Snapshot {
         stop_mark: Some(207),
         collecting: true,
         extracting: vec![ArchiveStatus {
-            archive_name: Some("blender-demo".into()),
+            archive_name: Some("fedora-41".into()),
             controller_status: Some("RUNNING".into()),
+            states: (0..10).map(|i| (format!("fedora-41.part{:02}.rar", i + 1), "COMPLETE".to_string())).collect(),
             ..Default::default()
         }],
         captchas: Vec::new(),
-        downloads: vec![finished, running, queued],
+        downloads: vec![finished, running, unpacking, queued],
         grabber: vec![grabbed],
         direct: Some("http://192.168.1.20:3129".into()),
     }

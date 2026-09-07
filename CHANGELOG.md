@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Extraction is shown in jdtui's own words — `Extracting`, `Extract queued`,
+  `Extracted`, `Extraction failed` — worked out from the extraction queue and
+  each link's status instead of JDownloader's localised sentence, which was
+  truncated and only readable in JDownloader's language.
+- The Status column has a share of the width of its own, and the header no
+  longer cuts off what is waiting.
 - `config.example.toml` documents every config key, and the README links
   to it.
 - `direct_addresses` can be keyed by device name, so an extra address is

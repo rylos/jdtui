@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use crate::api::{FolderPolicy, Link, Package, RemoveMode, Snapshot};
+use crate::api::{ArchiveStatus, FolderPolicy, Link, Package, RemoveMode, Snapshot};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
@@ -129,6 +129,70 @@ pub fn row_enabled(packages: &[Package], row: &Row) -> bool {
 }
 
 /// (link ids, package ids) for a set of rows, as the API takes them.
+/// What is happening to a row's archive, in jdtui's own words.
+///
+/// JDownloader reports it as a sentence in whatever language it runs in
+/// ("Estrazione OK: video.part01.rar"), which says nothing to jdtui and
+/// rarely fits the column. These four states come instead from fields
+/// that read the same everywhere: the extraction queue and the
+/// `extractionStatus` of each link.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Extraction {
+    /// Waiting for its turn in the extraction queue.
+    Queued,
+    /// Being extracted now.
+    Running,
+    /// Extracted without error.
+    Done,
+    /// JDownloader gave up on it: wrong password, damaged volume.
+    Failed,
+}
+
+impl Extraction {
+    pub fn label(self) -> &'static str {
+        match self {
+            Extraction::Queued => "Extract queued",
+            Extraction::Running => "Extracting",
+            Extraction::Done => "Extracted",
+            Extraction::Failed => "Extraction failed",
+        }
+    }
+}
+
+/// The archive in `queue` that `names` belong to, matched on the file
+/// names the archive is made of.
+fn archive_of<'a>(queue: &'a [ArchiveStatus], names: &[&str]) -> Option<&'a ArchiveStatus> {
+    queue.iter().find(|archive| names.iter().any(|name| archive.states.contains_key(*name)))
+}
+
+/// The extraction state of a row, or `None` when no archive is involved.
+pub fn extraction_of(packages: &[Package], row: &Row, queue: &[ArchiveStatus]) -> Option<Extraction> {
+    let package = &packages[row.package];
+    let names: Vec<&str> = match row.link {
+        Some(l) => vec![package.links[l].name.as_str()],
+        None => package.links.iter().map(|l| l.name.as_str()).collect(),
+    };
+    // The queue knows about the archive being worked on right now; what
+    // the links say is the outcome of a run that already ended.
+    if let Some(archive) = archive_of(queue, &names) {
+        return Some(match archive.controller_status.as_deref() {
+            Some("RUNNING") => Extraction::Running,
+            _ => Extraction::Queued,
+        });
+    }
+    let reported: Vec<&str> = match row.link {
+        Some(l) => package.links[l].extraction_status.as_deref().into_iter().collect(),
+        None => package.links.iter().filter_map(|l| l.extraction_status.as_deref()).collect(),
+    };
+    if reported.iter().any(|s| s.starts_with("ERROR")) {
+        return Some(Extraction::Failed);
+    }
+    // One extracted archive says nothing about a package still coming
+    // down: the rest of it may hold archives nobody has opened yet.
+    let settled = row.link.is_some() || package.is_finished();
+    (settled && reported.contains(&"SUCCESSFUL")).then_some(Extraction::Done)
+}
+
 pub fn collect_ids(packages: &[Package], rows: &[Row]) -> (Vec<i64>, Vec<i64>) {
     let mut links = Vec::new();
     let mut pkgs = Vec::new();
@@ -677,5 +741,83 @@ mod tests {
         form.index = form.fields.iter().position(|f| f.label == "Autostart").unwrap();
         form.cycle(1);
         assert!(form.flag("Autostart"));
+    }
+}
+
+#[cfg(test)]
+mod extraction_tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    fn archive(name: &str, status: &str, members: &[&str]) -> ArchiveStatus {
+        ArchiveStatus {
+            archive_name: Some(name.into()),
+            controller_status: Some(status.into()),
+            states: members.iter().map(|m| ((*m).to_string(), "COMPLETE".to_string())).collect::<BTreeMap<_, _>>(),
+            ..Default::default()
+        }
+    }
+
+    fn link(name: &str, extraction: Option<&str>) -> Link {
+        Link { name: name.into(), extraction_status: extraction.map(str::to_string), ..Default::default() }
+    }
+
+    fn package(links: Vec<Link>) -> Vec<Package> {
+        vec![Package { uuid: 1, name: "a package".into(), finished: Some(true), links, ..Default::default() }]
+    }
+
+    fn package_row() -> Row {
+        Row { package: 0, link: None, kind: RowKind::Package }
+    }
+
+    #[test]
+    fn an_archive_in_the_queue_names_the_package_it_belongs_to() {
+        let packages = package(vec![link("film.part1.rar", None), link("film.part2.rar", None)]);
+        let queue = vec![archive("film", "RUNNING", &["film.part1.rar", "film.part2.rar"])];
+        assert_eq!(extraction_of(&packages, &package_row(), &queue), Some(Extraction::Running));
+        let waiting = vec![archive("film", "QUEUED", &["film.part1.rar"])];
+        assert_eq!(extraction_of(&packages, &package_row(), &waiting), Some(Extraction::Queued));
+    }
+
+    #[test]
+    fn another_packages_archive_is_not_ours() {
+        let packages = package(vec![link("film.part1.rar", None)]);
+        let queue = vec![archive("music", "RUNNING", &["music.part1.rar"])];
+        assert_eq!(extraction_of(&packages, &package_row(), &queue), None);
+    }
+
+    #[test]
+    fn what_the_links_report_is_the_outcome_of_the_last_run() {
+        let done = package(vec![link("film.part1.rar", Some("SUCCESSFUL"))]);
+        assert_eq!(extraction_of(&done, &package_row(), &[]), Some(Extraction::Done));
+        let failed =
+            package(vec![link("film.part1.rar", Some("SUCCESSFUL")), link("film.part2.rar", Some("ERROR_CRC"))]);
+        assert_eq!(extraction_of(&failed, &package_row(), &[]), Some(Extraction::Failed));
+    }
+
+    #[test]
+    fn a_package_still_downloading_is_not_extracted() {
+        // Its finished volumes may report an earlier run; the package as
+        // a whole is not done with.
+        let mut packages = package(vec![link("film.part1.rar", Some("SUCCESSFUL")), link("film.part2.rar", None)]);
+        packages[0].finished = Some(false);
+        assert_eq!(extraction_of(&packages, &package_row(), &[]), None);
+        packages[0].finished = Some(true);
+        assert_eq!(extraction_of(&packages, &package_row(), &[]), Some(Extraction::Done));
+    }
+
+    #[test]
+    fn a_package_without_archives_has_no_extraction_state() {
+        let plain = package(vec![link("holiday.jpg", None)]);
+        assert_eq!(extraction_of(&plain, &package_row(), &[]), None);
+    }
+
+    #[test]
+    fn a_link_row_answers_for_itself() {
+        let packages = package(vec![link("film.part1.rar", Some("SUCCESSFUL")), link("film.part2.rar", None)]);
+        let second = Row { package: 0, link: Some(1), kind: RowKind::Link };
+        assert_eq!(extraction_of(&packages, &second, &[]), None);
+        let first = Row { package: 0, link: Some(0), kind: RowKind::Link };
+        assert_eq!(extraction_of(&packages, &first, &[]), Some(Extraction::Done));
     }
 }

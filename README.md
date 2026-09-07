@@ -38,6 +38,14 @@ stopped), the total speed as JDownloader reports it, how much is loaded and
 left, and anything that is waiting on you: captchas to solve, archives being
 extracted. `s` starts and stops the downloads, `p` pauses and resumes them.
 
+The **Status** column says what jdtui makes of a row rather than repeating
+JDownloader's own sentence: an archive being unpacked reads `Extracting`, one
+that came out whole `Extracted`, a damaged or password-protected one
+`Extraction failed`. JDownloader writes those in whatever language it runs in,
+and they rarely fit the column; jdtui works the state out from the extraction
+queue and from what each link reports, which read the same everywhere. Its own
+text is still shown for anything jdtui does not model, and in full under `i`.
+
 The footer lists the frequent keys; `?` opens the full reference.
 
 ![The key reference](docs/help.png)
