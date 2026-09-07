@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `jdtui add --autostart` takes an answer as well as standing alone:
+  `no`, `yes`, `true`, `false`, `on`, `off`, `1`, `0`, for a script whose
+  answer sits in a variable. It overrules what a crawljob asked for.
 - `jdtui add` takes files as well as urls: `.dlc`, `.ccf` and `.rsdf`
   containers and `.crawljob` files on this machine, the same ones the
   watched folder accepts.

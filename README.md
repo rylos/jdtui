@@ -201,6 +201,12 @@ jdtui status --json | jq -e .running >/dev/null && echo "busy"
 jdtui downloads --json | jq -r '.[] | select(.finished) | .name'
 ```
 
+`--autostart` on its own means yes, and it also takes an answer:
+`--autostart no`, or `yes`, `true`, `false`, `on`, `off`, `1`, `0`, so a
+script can pass whatever is in a variable. Left out, the links wait in the
+Link Grabber. An answer given on the command line also overrules what a
+crawljob asked for.
+
 An argument that names a file on this machine is sent as a file rather than
 as a url: `.dlc`, `.ccf` and `.rsdf` containers go to JDownloader whole, and
 a `.crawljob` is read here and sent as the jobs it describes, with the

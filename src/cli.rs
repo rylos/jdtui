@@ -58,9 +58,12 @@ pub enum Command {
         /// Password the hoster asks for.
         #[arg(long)]
         download_password: Option<String>,
-        /// Start downloading straight away.
-        #[arg(long)]
-        autostart: bool,
+        /// Start downloading straight away. `--autostart` on its own
+        /// means yes; `--autostart no` says so plainly, which is what a
+        /// script wants when the answer sits in a variable. Left out, the
+        /// links wait in the Link Grabber.
+        #[arg(long, num_args = 0..=1, default_missing_value = "yes", value_name = "yes|no", value_parser = yes_or_no)]
+        autostart: Option<bool>,
     },
     /// Watch a folder on this machine and send what is dropped into it:
     /// `.crawljob` files and `.dlc`, `.ccf`, `.rsdf` containers. Each one
@@ -262,7 +265,7 @@ pub fn run(command: Command, config: &Config, json: bool, device: Option<&str>) 
                 extract_password: extract_password.unwrap_or_default(),
                 download_password: download_password.unwrap_or_default(),
                 priority: String::new(),
-                autostart,
+                autostart: autostart.unwrap_or(false),
             };
             // An argument that names a file here is a file, not a url.
             let (files, urls): (Vec<String>, Vec<String>) = urls.into_iter().partition(|a| PathBuf::from(a).is_file());
@@ -282,7 +285,8 @@ pub fn run(command: Command, config: &Config, json: bool, device: Option<&str>) 
                         bail!("{file} holds no job with a url in it");
                     }
                     for job in found {
-                        api.add_links(&fill(job, &defaults)).with_context(|| format!("adding a job from {file}"))?;
+                        api.add_links(&fill(job, &defaults, autostart))
+                            .with_context(|| format!("adding a job from {file}"))?;
                         jobs += 1;
                     }
                     sent_files += 1;
@@ -317,9 +321,20 @@ pub fn run(command: Command, config: &Config, json: bool, device: Option<&str>) 
     Ok(())
 }
 
+/// The many ways people write a yes and a no, since the answer often
+/// comes out of a shell variable rather than off a keyboard.
+fn yes_or_no(value: &str) -> Result<bool, String> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "y" | "yes" | "true" | "on" => Ok(true),
+        "0" | "n" | "no" | "false" | "off" => Ok(false),
+        other => Err(format!("say yes or no, not {other:?}")),
+    }
+}
+
 /// A job says what it wants; where it says nothing, the command line
-/// answers for it.
-fn fill(job: watch::Job, defaults: &AddLinks) -> AddLinks {
+/// answers for it. Except for autostart: there, an answer given on the
+/// command line was given on purpose, so it wins.
+fn fill(job: watch::Job, defaults: &AddLinks, autostart: Option<bool>) -> AddLinks {
     let or = |from: String, fallback: &str| if from.is_empty() { fallback.to_string() } else { from };
     AddLinks {
         links: job.links,
@@ -328,7 +343,7 @@ fn fill(job: watch::Job, defaults: &AddLinks) -> AddLinks {
         extract_password: or(job.extract_password, &defaults.extract_password),
         download_password: or(job.download_password, &defaults.download_password),
         priority: job.priority,
-        autostart: job.autostart || defaults.autostart,
+        autostart: autostart.unwrap_or(job.autostart),
     }
 }
 
@@ -458,6 +473,32 @@ mod tests {
         assert_eq!(json["state"], "RUNNING");
         assert_eq!(json["running"], true);
         assert_eq!(json["direct"], "http://192.168.1.30:3129");
+    }
+
+    #[test]
+    fn yes_and_no_are_understood_however_they_are_written() {
+        for yes in ["yes", "Y", "true", "ON", "1", " yes "] {
+            assert_eq!(yes_or_no(yes), Ok(true), "{yes:?} means yes");
+        }
+        for no in ["no", "N", "false", "OFF", "0"] {
+            assert_eq!(yes_or_no(no), Ok(false), "{no:?} means no");
+        }
+        assert!(yes_or_no("maybe").is_err());
+    }
+
+    #[test]
+    fn an_answer_on_the_command_line_beats_the_job() {
+        let job = watch::Job { links: "https://example.com/a".into(), autostart: true, ..Default::default() };
+        let defaults = AddLinks::default();
+        // The job wants to start; the command line was not asked.
+        assert!(fill(job, &defaults, None).autostart);
+
+        let job = watch::Job { links: "https://example.com/a".into(), autostart: true, ..Default::default() };
+        // Told no on purpose, so no.
+        assert!(!fill(job, &defaults, Some(false)).autostart);
+
+        let job = watch::Job { links: "https://example.com/a".into(), ..Default::default() };
+        assert!(fill(job, &defaults, Some(true)).autostart);
     }
 
     #[test]
