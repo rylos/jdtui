@@ -1248,13 +1248,14 @@ fn draw_accounts(frame: &mut Frame, app: &App, area: Rect) {
 /// lists them. Sections are headings rather than rows, so the cursor only
 /// ever lands on something that can be changed.
 fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
-    let popup = centered(area, area.width.saturating_sub(6).min(96), area.height);
-    frame.render_widget(Clear, popup);
     let hint = "Enter change · r default · ↑↓ move · Esc close";
-    let block = panel("Settings", Some(hint));
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    let width = area.width.saturating_sub(6).min(96);
     if app.options.is_empty() {
+        let popup = centered(area, width, 3);
+        frame.render_widget(Clear, popup);
+        let block = panel("Settings", Some(hint));
+        let inner = block.inner(popup);
+        frame.render_widget(block, popup);
         frame.render_widget(
             Paragraph::new(Line::from(" This JDownloader reported none of these settings").dim().italic()),
             padded(inner),
@@ -1263,14 +1264,16 @@ fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     // The note of the highlighted setting sits at the foot of the panel, so
-    // the list above it is one line shorter.
-    let note_height = 2;
-    let list_height = inner.height.saturating_sub(note_height) as usize;
+    // the list above it is two lines shorter.
+    let note_height = 2u16;
+    let label_width = 34usize;
+    // The value gets whatever the label leaves, less the borders, the cursor
+    // column, the padding and the room a `·` needs.
+    let value_width = (width as usize).saturating_sub(label_width + 12).max(12);
 
     let mut lines: Vec<Line> = Vec::new();
     // Which setting each line belongs to; headings belong to none.
     let mut owner: Vec<Option<usize>> = Vec::new();
-    let label_width = 34usize;
     let mut section = "";
     for (i, setting) in app.options.iter().enumerate() {
         if setting.spec.section != section {
@@ -1293,7 +1296,7 @@ fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
         let mut spans = vec![
             Span::raw(format!("  {} ", if selected { "›" } else { " " })),
             Span::raw(format!("{:<label_width$}", truncate(setting.spec.label, label_width))),
-            Span::styled(truncate(&value, 40), value_style),
+            Span::styled(truncate(&value, value_width), value_style),
         ];
         if !setting.is_default() {
             spans.push(Span::styled("  ·", Style::new().dim()));
@@ -1305,6 +1308,17 @@ fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(line);
         owner.push(Some(i));
     }
+
+    // The panel is as tall as it needs to be, and no taller: a full-height
+    // box with the settings at the top and nothing under them reads as if
+    // something had failed to load.
+    let height = (lines.len() as u16 + note_height + 2).min(area.height);
+    let popup = centered(area, width, height);
+    frame.render_widget(Clear, popup);
+    let block = panel("Settings", Some(hint));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    let list_height = inner.height.saturating_sub(note_height) as usize;
 
     // Scroll so the highlighted row stays on screen, keeping its heading
     // visible when it can.
@@ -1495,6 +1509,24 @@ mod tests {
         assert!(shows(&app, "10.00 KB/s"), "a speed is shown in its unit, not in bytes");
         assert!(shows(&app, "/output"));
         assert!(shows(&app, "How many files download at the same time"), "the note of the highlighted setting");
+    }
+
+    #[test]
+    fn the_settings_panel_is_no_taller_than_it_needs() {
+        let mut app = App::with_snapshot(sample());
+        app.options = options();
+        app.mode = crate::app::Mode::Options;
+        let mut terminal = Terminal::new(TestBackend::new(170, 60)).unwrap();
+        terminal.draw(|frame| draw(frame, &app)).unwrap();
+        let buffer = terminal.backend().buffer().clone();
+        let width = buffer.area().width as usize;
+        let rows: Vec<String> =
+            buffer.content().chunks(width).map(|r| r.iter().map(|c| c.symbol()).collect::<String>()).collect();
+        let top = rows.iter().position(|r| r.contains("Settings")).expect("the panel");
+        let bottom = rows.iter().rposition(|r| r.contains("Esc close")).expect("the panel foot");
+        // One heading and one row per section, plus blanks, the note and the
+        // borders: comfortably under twenty on this sample.
+        assert!(bottom - top < 20, "the panel spans {} rows on a 60-row terminal", bottom - top);
     }
 
     #[test]

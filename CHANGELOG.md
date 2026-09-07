@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- The Settings panel is only as tall as its contents. On a tall terminal it
+  filled the screen with the settings at the top and nothing under them,
+  which read as if something had failed to load. Long values also get the
+  room the panel actually has instead of a fixed forty columns.
+
 ## 1.7.0 — 2026-09-07
 
 - `o` opens a curated Settings panel: the twenty-odd settings of the
