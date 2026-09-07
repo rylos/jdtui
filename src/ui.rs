@@ -130,6 +130,12 @@ fn centered(area: Rect, width: u16, height: u16) -> Rect {
     Rect::new(area.x + (area.width - w) / 2, area.y + (area.height - h) / 2, w, h)
 }
 
+/// The inside of a panel, one cell short on the right. Text that reaches
+/// the border reads as if it had been cut off, even when it has not.
+fn padded(inner: Rect) -> Rect {
+    Rect { width: inner.width.saturating_sub(1), ..inner }
+}
+
 fn panel(title: &str, subtitle: Option<&str>) -> Block<'static> {
     let mut b = Block::bordered()
         .border_type(BorderType::Rounded)
@@ -158,7 +164,7 @@ fn draw_login(frame: &mut Frame, form: &Form, error: Option<&str>) {
     }
     lines.push(Line::raw(""));
     lines.push(Line::from("  Credentials are saved to the config file after the first successful sign in.").dim());
-    frame.render_widget(Paragraph::new(lines), inner);
+    frame.render_widget(Paragraph::new(lines), padded(inner));
 }
 
 fn draw_devices(frame: &mut Frame, devices: &[crate::myjd::Device], index: usize) {
@@ -409,7 +415,7 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
             lines.push(Line::raw(""));
             lines.push(preview);
         }
-        frame.render_widget(Paragraph::new(lines), inner);
+        frame.render_widget(Paragraph::new(lines), padded(inner));
         return;
     }
 
@@ -813,7 +819,7 @@ fn draw_remove_choice(frame: &mut Frame, app: &App, area: Rect) {
         };
         lines.push(Line::from(Span::styled(format!(" {} {}", if selected { "›" } else { " " }, mode.label()), style)));
     }
-    frame.render_widget(Paragraph::new(lines), inner);
+    frame.render_widget(Paragraph::new(lines), padded(inner));
 }
 
 fn draw_priority_choice(frame: &mut Frame, app: &App, area: Rect) {
@@ -832,7 +838,7 @@ fn draw_priority_choice(frame: &mut Frame, app: &App, area: Rect) {
             Line::from(Span::styled(format!(" {} {label}", if selected { "›" } else { " " }), style))
         })
         .collect();
-    frame.render_widget(Paragraph::new(lines), inner);
+    frame.render_widget(Paragraph::new(lines), padded(inner));
 }
 
 fn draw_variant_choice(frame: &mut Frame, app: &App, area: Rect) {
@@ -850,7 +856,7 @@ fn draw_variant_choice(frame: &mut Frame, app: &App, area: Rect) {
             Line::from(Span::styled(format!(" {} {name}", if selected { "›" } else { " " }), style))
         })
         .collect();
-    frame.render_widget(Paragraph::new(lines), inner);
+    frame.render_widget(Paragraph::new(lines), padded(inner));
 }
 
 fn draw_menu(frame: &mut Frame, app: &App, area: Rect) {
@@ -874,7 +880,7 @@ fn draw_menu(frame: &mut Frame, app: &App, area: Rect) {
             Line::from(Span::styled(format!(" {} {}", if selected { "›" } else { " " }, e.label), style))
         })
         .collect();
-    frame.render_widget(Paragraph::new(lines), inner);
+    frame.render_widget(Paragraph::new(lines), padded(inner));
 }
 
 fn draw_properties(frame: &mut Frame, app: &App, area: Rect) {
@@ -1008,7 +1014,9 @@ fn draw_help(frame: &mut Frame, area: Rect) {
     for (i, lines) in columns.into_iter().enumerate() {
         let mut text = vec![Line::raw(""); top_blank];
         text.extend(lines);
-        frame.render_widget(Paragraph::new(text), cols[i]);
+        // Each column stops one cell short too, so nothing leans against
+        // the column beside it either.
+        frame.render_widget(Paragraph::new(text), padded(cols[i]));
     }
 }
 
@@ -1022,7 +1030,7 @@ fn draw_urls(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(block, popup);
     let mut lines = vec![Line::raw("")];
     lines.extend(app.urls.iter().map(|u| Line::from(format!(" {u}"))));
-    frame.render_widget(Paragraph::new(lines), inner);
+    frame.render_widget(Paragraph::new(lines), padded(inner));
 }
 
 fn draw_folders(frame: &mut Frame, app: &App, area: Rect) {
@@ -1039,7 +1047,7 @@ fn draw_folders(frame: &mut Frame, app: &App, area: Rect) {
         let style = if selected { selected_style() } else { Style::new() };
         Line::from(Span::styled(format!(" {} {f}", if selected { "›" } else { " " }), style))
     }));
-    frame.render_widget(Paragraph::new(lines), inner);
+    frame.render_widget(Paragraph::new(lines), padded(inner));
 }
 
 /// How long JDownloader has been up, from milliseconds.
@@ -1157,7 +1165,7 @@ fn draw_about(frame: &mut Frame, app: &App, area: Rect) {
         lines.truncate(room.saturating_sub(1));
         lines.push(Line::from(Span::styled(format!("  … {hidden} more line(s)"), Style::new().dim().italic())));
     }
-    frame.render_widget(Paragraph::new(lines), inner);
+    frame.render_widget(Paragraph::new(lines), padded(inner));
 }
 
 fn draw_accounts(frame: &mut Frame, app: &App, area: Rect) {
@@ -1170,7 +1178,10 @@ fn draw_accounts(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(block, popup);
 
     if n == 0 {
-        frame.render_widget(Paragraph::new(Line::from(" No accounts on this JDownloader").dim().italic()), inner);
+        frame.render_widget(
+            Paragraph::new(Line::from(" No accounts on this JDownloader").dim().italic()),
+            padded(inner),
+        );
         return;
     }
     let rows: Vec<TRow> = app

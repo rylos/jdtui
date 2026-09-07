@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Panels keep a space before their border, so nothing reads as if it had
+  been cut off. Two key descriptions that filled the column exactly are
+  shorter.
+
 ## 1.5.0 — 2026-09-07
 
 - `watch_folder` in the config names a folder to watch: `jdtui watch`
