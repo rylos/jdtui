@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.7.0 — 2026-09-07
 
 - `o` opens a curated Settings panel: the twenty-odd settings of the
   JDownloader that get touched while downloads are running, out of the two
