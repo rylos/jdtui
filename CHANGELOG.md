@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.6.0 — 2026-09-07
 
 - `jdtui add --autostart` takes an answer as well as standing alone:
   `no`, `yes`, `true`, `false`, `on`, `off`, `1`, `0`, for a script whose
