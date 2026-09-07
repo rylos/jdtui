@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.0 — 2026-09-07
 
 - Extraction is shown in jdtui's own words — `Extracting`, `Extract queued`,
   `Extracted`, `Extraction failed` — worked out from the extraction queue and
