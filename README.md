@@ -202,6 +202,32 @@ Nothing is ever asked interactively, so the account has to be in the config
 file already, which it is after the first run of the interface. A failure
 prints to stderr and exits non-zero.
 
+### Watching a folder
+
+`jdtui watch <folder>` keeps an eye on a folder on **this** machine and hands
+what lands in it to JDownloader: `.crawljob` files, in either shape Folder
+Watch accepts, and `.dlc`, `.ccf` and `.rsdf` containers, which JDownloader
+opens itself.
+
+```bash
+jdtui watch ~/jd-inbox                 # until Ctrl-C, looking every 5 seconds
+jdtui watch ~/jd-inbox --interval 30
+jdtui watch ~/jd-inbox --once          # sweep and exit, for cron
+```
+
+Each file is moved to `processed` beside it once JDownloader has taken it, or
+to `failed` if it would not, so nothing is ever sent twice. A file is left
+alone until it stops growing, and it is claimed by moving it before it is
+read, which on Windows also skips whatever another program still holds open.
+Files written with CRLF, with a byte order mark, or saved as UTF-16 are read
+all the same, and the metadata files macOS leaves next to a copy are ignored.
+
+JDownloader has a Folder Watch of its own, and when the folder is on the
+machine JDownloader runs on, that one is the better tool: it needs no client
+running at all. This is for a folder on your own machine, which JDownloader
+cannot see. Note that a `downloadFolder` named inside a job is a path on the
+JDownloader machine, not on this one.
+
 ## Config
 
 `~/.config/jdtui/config.toml` (print the exact path with `jdtui --config-path`).

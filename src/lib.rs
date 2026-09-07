@@ -11,3 +11,4 @@ pub mod model;
 pub mod myjd;
 pub mod poller;
 pub mod ui;
+pub mod watch;

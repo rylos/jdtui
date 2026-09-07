@@ -42,3 +42,9 @@
 - **The ETA lives on the links, not the package**: during extraction `package.eta` is absent while each archive link carries `eta` and `status` = the localized "extracting" word. jdtui takes the longest link eta for the package row (`ui::package_eta`).
 - **Units differ by state**: download eta is in SECONDS, extraction eta is in MILLISECONDS. Verified twice — the figure fell ~1000-1350 per wall-clock second, and 425811 ms seen at ~10:16:30 predicted the end at 10:23:36 against an actual 10:23:41. `ui::eta_seconds(raw, extracting)` divides by 1000 only while extracting.
 - Full lifecycle confirmed on a real 67 GB / 33-volume RAR: queue entry with `controllerStatus: RUNNING` → jdtui "Extracting" (JD meanwhile said only "Completato", i.e. the download); after the run the links flip to `SUCCESSFUL` → jdtui "Extracted".
+
+## Containers and crawljobs (verified 2026-09-07)
+
+- `linkgrabberv2/addContainer(type, content)`: `content` MUST be a base64 **data URL** — JD does `getInputStreamFromBase64DataURL`, which looks for `;base64,` and decodes what follows (source: `LinkCollectorAPIImplV2.loadContainer`). `type` is used as the file extension of the temp file, so pass the container's own extension (`dlc`, `ccf`, `rsdf`). jdtui sends `data:application/octet-stream;base64,<b64>` (`JdApi::add_container`).
+- `.crawljob` keys (Folder Watch `explain.txt`): text, packageName, downloadFolder, extractPasswords, downloadPassword, priority, autoStart, forcedStart, enabled, chunks, comment, filename, autoConfirm, deepAnalyseEnabled, addOfflineLink, overwritePackagizerEnabled, extractAfterDownload. Entries separated by a line containing `->NEW ENTRY<-`, `#` comments, and a JSON array form is also accepted. jdtui maps the subset the API can express (`watch::parse_crawljob`).
+- The FolderWatch extension itself is a JD extension (`InstallExtensionFOLDERWATCH` in `config/list`), watching folders on the JD machine only — not installed on the user's jd2@docker.

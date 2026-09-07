@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `jdtui watch <folder>` sends what is dropped into a folder on this
+  machine to JDownloader, `.crawljob` files and `.dlc`, `.ccf`, `.rsdf`
+  containers, filing each away afterwards. JDownloader cannot watch a
+  folder it has no access to; this covers that. Suggested by the
+  JDownloader team.
 - jdtui answers questions in a script: `status`, `downloads`, `grabber`,
   `devices`, `start`, `stop`, `pause`, `resume` and `add`, in text or with
   `--json` for `jq`. `--device` picks the JDownloader. Suggested by the

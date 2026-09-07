@@ -7,6 +7,10 @@
 //! interactively: the account has to be in the config file already, which
 //! it is after the first run of the interface.
 
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::time::Duration;
+
 use anyhow::{Context, Result, bail};
 use clap::Subcommand;
 use serde::Serialize;
@@ -14,6 +18,7 @@ use serde::Serialize;
 use crate::api::{AddLinks, JdApi, Package, Snapshot};
 use crate::config::Config;
 use crate::myjd::MyJd;
+use crate::watch;
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
@@ -52,6 +57,20 @@ pub enum Command {
         /// Start downloading straight away.
         #[arg(long)]
         autostart: bool,
+    },
+    /// Watch a folder on this machine and send what is dropped into it:
+    /// `.crawljob` files and `.dlc`, `.ccf`, `.rsdf` containers. Each one
+    /// is moved to `processed` beside it once JDownloader has taken it,
+    /// or to `failed` if it would not.
+    Watch {
+        /// The folder to watch.
+        folder: PathBuf,
+        /// Seconds between one look and the next.
+        #[arg(long, default_value_t = 5)]
+        interval: u64,
+        /// Send what is there now and exit, for cron and the like.
+        #[arg(long)]
+        once: bool,
     },
 }
 
@@ -197,6 +216,24 @@ pub fn run(command: Command, config: &Config, json: bool, device: Option<&str>) 
         Command::Resume => {
             api.pause(false).context("resuming the downloads")?;
             done(json, "resumed");
+        }
+        Command::Watch { folder, interval, once } => {
+            if once {
+                // Two looks with a pause between them: a file is only
+                // taken once it has stopped growing, and one look cannot
+                // tell that.
+                let mut seen = HashMap::new();
+                let mut sent = watch::sweep(&mut api, &folder, &mut seen)?;
+                std::thread::sleep(watch::SETTLE);
+                sent += watch::sweep(&mut api, &folder, &mut seen)?;
+                if json {
+                    println!("{}", serde_json::json!({ "sent": sent }));
+                } else {
+                    println!("{sent} file(s) sent");
+                }
+            } else {
+                watch::watch(&mut api, &folder, Duration::from_secs(interval.max(1)))?;
+            }
         }
         Command::Add { urls, package, folder, extract_password, download_password, autostart } => {
             let links = if urls.is_empty() { read_stdin()? } else { urls.join("\n") };

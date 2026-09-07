@@ -48,6 +48,10 @@ split across a Downloads and a Link Grabber tab.
   colours follow the state as well, so a finished link and a downloading one
   no longer look alike
 - switch between the JDownloader instances on the account without restarting
+- it can watch a folder on the machine it runs on and hand what is dropped
+  there to JDownloader, crawljob files and DLC/CCF/RSDF containers, which is
+  the half of a folder watch JDownloader's own extension cannot do from the
+  other side of the network
 - given a command instead of nothing, it answers on stdout and exits, so it
   fits in a script: status, downloads, grabber, devices, start/stop/pause,
   add, with --json for jq

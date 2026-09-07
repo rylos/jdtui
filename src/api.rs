@@ -874,6 +874,16 @@ impl JdApi {
         self.call_unit("/linkgrabberv2/moveToDownloadlist", &[json!(links), json!(packages)])
     }
 
+    /// Hand JDownloader a container file: DLC, CCF, RSDF. It wants the
+    /// bytes as a base64 data URL and uses `kind` as the file extension it
+    /// saves them under, so that is the container's own extension.
+    pub fn add_container(&mut self, kind: &str, bytes: &[u8]) -> Result<()> {
+        use base64::Engine as _;
+        let content =
+            format!("data:application/octet-stream;base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes));
+        self.call_unit("/linkgrabberv2/addContainer", &[json!(kind), json!(content)])
+    }
+
     pub fn add_links(&mut self, req: &AddLinks) -> Result<()> {
         let priority = if req.priority.is_empty() { "DEFAULT" } else { req.priority.as_str() };
         self.call_unit(
