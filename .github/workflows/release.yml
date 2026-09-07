@@ -54,7 +54,11 @@ jobs:
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-musl
             asset: aarch64-linux
-          - os: macos-13
+          # Both macOS builds happen on Apple Silicon: its toolchain
+          # cross-compiles for Intel, and the Intel runners are scarce
+          # enough to keep a release waiting for one that is on its way out
+          # anyway.
+          - os: macos-14
             target: x86_64-apple-darwin
             asset: x86_64-macos
           - os: macos-14
