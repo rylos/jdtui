@@ -151,7 +151,11 @@ standby) is there.
 
 ## Config
 
-`~/.config/jdtui/config.toml` (print the exact path with `jdtui --config-path`):
+`~/.config/jdtui/config.toml` (print the exact path with `jdtui --config-path`).
+
+You never have to write it by hand: jdtui creates it after the first sign in
+and keeps the credentials and the chosen device up to date, with mode `0600`.
+Everything else is optional and has a working default.
 
 ```toml
 email = "you@example.com"
@@ -162,17 +166,17 @@ device = "…"
 refresh_ms = 1000
 # listen to JDownloader's event channel (default true); --no-events for one run
 events = true
-# connect to JDownloader directly when it can be reached (default true);
-# --no-direct for one run
+# connect straight to JDownloader when it answers (default true); --no-direct
 direct = true
-# addresses to try besides those JDownloader reports about itself, host:port.
-# With one JDownloader a plain list will do:
-#   direct_addresses = ["192.168.1.20:3129"]
-# With several, key them by device name so an address is tried for the
-# machine it belongs to and no other:
+
+# addresses JDownloader cannot report for itself, such as a container's host,
+# keyed by device name so each one is tried for the machine it belongs to
 [direct_addresses]
-"jd2@home" = ["192.168.1.20:3129"]
+"jd2@docker" = ["192.168.1.30:3129"]
 ```
+
+[**config.example.toml**](config.example.toml) is the same file with every key
+explained: what it does, what it defaults to, and when you would change it.
 
 ## How it talks to JDownloader
 

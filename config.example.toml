@@ -1,0 +1,125 @@
+# jdtui configuration — ~/.config/jdtui/config.toml
+#
+# Print the exact path on your machine with `jdtui --config-path`.
+#
+# You do not have to write this file by hand. jdtui creates it after the
+# first successful sign in and keeps `email`, `password` and `device` up to
+# date on its own; the file is written with mode 0600 because it holds your
+# password in clear. Everything below `device` is optional, and every key
+# has a working default, so a file with only the credentials is enough.
+#
+# Note on ordering: `[direct_addresses]` at the end is a TOML table, and a
+# table ends the top-level section. Any plain `key = value` you add after it
+# would belong to the table instead of to jdtui. Keep the simple keys first.
+
+
+# --- Account -----------------------------------------------------------
+#
+# Your My.JDownloader account, the same one the browser extension and the
+# web interface use. jdtui asks for these on the first run and writes them
+# here; it only asks again if they stop working.
+
+email = "you@example.com"
+password = "your-my-jdownloader-password"
+
+
+# --- Which JDownloader -------------------------------------------------
+#
+# The device id of the JDownloader picked last time. It is an opaque
+# string, not a name: jdtui fills it in when you choose from the list.
+#
+# Delete this line to be asked again on the next run, or press `d` inside
+# jdtui to switch to another JDownloader of the account. `jdtui
+# --choose-device` does the same for a single run without touching the file.
+
+device = "0123456789abcdef0123456789abcdef"
+
+
+# --- Refresh -----------------------------------------------------------
+#
+# How often the lists are fetched, in milliseconds. Default 1000, and
+# values below 200 are raised to 200.
+#
+# Each refresh is four round trips to JDownloader, so through the
+# My.JDownloader relay a full second is about as fast as it is worth
+# going. On a direct connection (see below) the calls take a few
+# milliseconds and a shorter period costs little.
+#
+# This is the ceiling, not the whole story: an action you trigger refreshes
+# at once, and so does any event, so the interface stays current between
+# ticks. While the event channel is up and nothing is downloading, the
+# period stretches to thirty seconds on its own.
+
+refresh_ms = 1000
+
+
+# --- Event channel -----------------------------------------------------
+#
+# Subscribe to JDownloader's event channel on a second connection, so a
+# link added from the browser or another client shows up within a second
+# or two instead of at the next refresh. Default true. The header says
+# `live` while the channel is up; if it drops, jdtui keeps polling at
+# `refresh_ms` and reopens the channel every ten seconds.
+#
+# Set it to false, or start with `jdtui --no-events`, to poll only.
+
+events = true
+
+
+# --- Direct connection -------------------------------------------------
+#
+# Talk to JDownloader directly instead of relaying every call through
+# my.jdownloader.org, exactly as the web interface does. Default true.
+#
+# How it works: jdtui asks JDownloader which addresses it can be reached
+# at (the "direct connection" setting in JDownloader's My.JDownloader
+# options, LAN and/or WAN), pings them all at once and keeps the fastest
+# that answers. The payload is encrypted the same way either side of the
+# relay, so nothing changes on the wire but the host it goes to. On a LAN
+# this turns a ~100 ms call into a ~5 ms one.
+#
+# It is safe to leave on wherever you are: if no address answers, or a
+# working one stops answering, jdtui falls back to the relay on the spot
+# and looks again every five minutes. The header shows which is in use,
+# `⇄ direct` or `☁ relay`.
+#
+# Set it to false, or start with `jdtui --no-direct`, to always use the
+# relay.
+
+direct = true
+
+
+# --- Extra addresses for the direct connection -------------------------
+#
+# Addresses to try besides the ones JDownloader reports about itself,
+# written as `host:port` (the port is JDownloader's direct connection
+# port, 3129 by default).
+#
+# You need this when JDownloader cannot see how you reach it. The common
+# case is a container: a JDownloader in Docker reports its own address
+# inside the container network, such as 172.17.0.8, which means nothing to
+# you; what works is the address of the host with the mapped port, and
+# only you know that.
+#
+# Two forms are accepted, and you use one or the other, not both.
+#
+# With a single JDownloader, a plain list is enough. Put it with the other
+# simple keys above, before any table:
+#
+#   direct_addresses = ["192.168.1.20:3129"]
+#
+# With several JDownloaders, key the addresses by device name, the name
+# shown in the device picker and in jdtui's title bar. An address belongs
+# to one machine, so this keeps it from being tried for a JDownloader that
+# lives somewhere else:
+
+[direct_addresses]
+"jd2@nas" = ["192.168.1.20:3129"]
+"jd2@docker" = ["192.168.1.30:3129", "10.8.0.30:3129"]
+
+# A device you do not name here is not left out: its own reported
+# addresses are still probed, it simply gets no extra ones.
+#
+# Several addresses for one device are fine. They are pinged together and
+# the fastest to answer wins, which is a neat way to cover a machine you
+# reach differently from home, from the office or over a VPN.

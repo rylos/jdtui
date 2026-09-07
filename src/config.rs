@@ -132,6 +132,19 @@ mod tests {
     }
 
     #[test]
+    fn the_example_config_still_matches_the_code() {
+        // config.example.toml is what the README sends people to; it must
+        // never drift from the keys jdtui actually reads.
+        let cfg: Config = toml::from_str(include_str!("../config.example.toml")).expect("example config");
+        assert_eq!(cfg.email.as_deref(), Some("you@example.com"));
+        assert_eq!(cfg.refresh_ms(), 1000);
+        assert!(cfg.events());
+        assert_eq!(cfg.direct_for("jd2@nas").as_deref(), Some(["192.168.1.20:3129".to_string()].as_slice()));
+        assert_eq!(cfg.direct_for("jd2@docker").map(|a| a.len()), Some(2));
+        assert_eq!(cfg.direct_for("jd2@elsewhere"), Some(Vec::new()));
+    }
+
+    #[test]
     fn keyed_addresses_survive_a_save() {
         // The config is rewritten whenever a device is picked; a table
         // must come back as a table.

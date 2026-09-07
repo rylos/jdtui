@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `config.example.toml` documents every config key, and the README links
+  to it.
 - `direct_addresses` can be keyed by device name, so an extra address is
   tried for the JDownloader it belongs to and not for the others. A plain
   list still serves every device.
