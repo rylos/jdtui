@@ -144,9 +144,14 @@ fn parse_json(text: &str) -> Vec<Job> {
     jobs
 }
 
+/// Containers, the extensions JDownloader opens itself.
+pub fn is_container(extension: &str) -> bool {
+    CONTAINERS.contains(&extension.to_ascii_lowercase().as_str())
+}
+
 /// Read a text file whoever wrote it. Windows editors like to add a byte
 /// order mark, and the older ones save UTF-16.
-fn read_text(path: &Path) -> Result<String> {
+pub fn read_text(path: &Path) -> Result<String> {
     let bytes = fs::read(path).with_context(|| format!("reading {}", path.display()))?;
     let text = match bytes.as_slice() {
         [0xFF, 0xFE, rest @ ..] => decode_utf16(rest, u16::from_le_bytes),

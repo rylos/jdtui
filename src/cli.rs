@@ -38,9 +38,13 @@ pub enum Command {
     Pause,
     /// Resume paused downloads.
     Resume,
-    /// Add links to the Link Grabber.
+    /// Add links to the Link Grabber. An argument that names a file on
+    /// this machine is sent as one: `.dlc`, `.ccf` and `.rsdf` containers
+    /// go to JDownloader whole, a `.crawljob` is read and turned into the
+    /// jobs it describes.
     Add {
-        /// The urls. Reads them from stdin, one per line, when given none.
+        /// Urls, or paths to container and crawljob files. Reads urls
+        /// from stdin, one per line, when given none.
         urls: Vec<String>,
         /// Name of the package they go into.
         #[arg(long)]
@@ -251,29 +255,81 @@ pub fn run(command: Command, config: &Config, json: bool, device: Option<&str>) 
             }
         }
         Command::Add { urls, package, folder, extract_password, download_password, autostart } => {
-            let links = if urls.is_empty() { read_stdin()? } else { urls.join("\n") };
-            if links.trim().is_empty() {
-                bail!("no urls given, on the command line or on stdin");
-            }
-            let count = links.lines().filter(|l| !l.trim().is_empty()).count();
-            api.add_links(&AddLinks {
-                links,
+            let defaults = AddLinks {
+                links: String::new(),
                 package_name: package.unwrap_or_default(),
                 destination: folder.unwrap_or_default(),
                 extract_password: extract_password.unwrap_or_default(),
                 download_password: download_password.unwrap_or_default(),
                 priority: String::new(),
                 autostart,
-            })
-            .context("adding the links")?;
+            };
+            // An argument that names a file here is a file, not a url.
+            let (files, urls): (Vec<String>, Vec<String>) = urls.into_iter().partition(|a| PathBuf::from(a).is_file());
+            let mut sent_files = 0;
+            let mut jobs = 0;
+            for file in &files {
+                let path = PathBuf::from(file);
+                let extension = path.extension().and_then(|e| e.to_str()).unwrap_or_default().to_ascii_lowercase();
+                if watch::is_container(&extension) {
+                    let bytes = std::fs::read(&path).with_context(|| format!("reading {file}"))?;
+                    api.add_container(&extension, &bytes).with_context(|| format!("sending {file}"))?;
+                    sent_files += 1;
+                } else if extension == "crawljob" {
+                    let text = watch::read_text(&path)?;
+                    let found = watch::parse_crawljob(&text);
+                    if found.is_empty() {
+                        bail!("{file} holds no job with a url in it");
+                    }
+                    for job in found {
+                        api.add_links(&fill(job, &defaults)).with_context(|| format!("adding a job from {file}"))?;
+                        jobs += 1;
+                    }
+                    sent_files += 1;
+                } else {
+                    bail!("{file} is a file, but only .dlc, .ccf, .rsdf and .crawljob can be sent as one");
+                }
+            }
+
+            let mut count = 0;
+            let links = if urls.is_empty() && files.is_empty() { read_stdin()? } else { urls.join("\n") };
+            if !links.trim().is_empty() {
+                count = links.lines().filter(|l| !l.trim().is_empty()).count();
+                api.add_links(&AddLinks { links, ..defaults }).context("adding the links")?;
+            } else if files.is_empty() {
+                bail!("nothing given, on the command line or on stdin");
+            }
+
             if json {
-                println!("{}", serde_json::json!({ "added": count }));
+                println!("{}", serde_json::json!({ "urls": count, "files": sent_files, "jobs": jobs }));
             } else {
-                println!("Added {count} url(s) to the Link Grabber");
+                let mut said = Vec::new();
+                if count > 0 {
+                    said.push(format!("{count} url(s)"));
+                }
+                if sent_files > 0 {
+                    said.push(format!("{sent_files} file(s)"));
+                }
+                println!("Sent {} to the Link Grabber", said.join(" and "));
             }
         }
     }
     Ok(())
+}
+
+/// A job says what it wants; where it says nothing, the command line
+/// answers for it.
+fn fill(job: watch::Job, defaults: &AddLinks) -> AddLinks {
+    let or = |from: String, fallback: &str| if from.is_empty() { fallback.to_string() } else { from };
+    AddLinks {
+        links: job.links,
+        package_name: or(job.package_name, &defaults.package_name),
+        destination: or(job.destination, &defaults.destination),
+        extract_password: or(job.extract_password, &defaults.extract_password),
+        download_password: or(job.download_password, &defaults.download_password),
+        priority: job.priority,
+        autostart: job.autostart || defaults.autostart,
+    }
 }
 
 fn done(json: bool, what: &str) {

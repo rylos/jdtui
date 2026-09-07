@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `jdtui add` takes files as well as urls: `.dlc`, `.ccf` and `.rsdf`
+  containers and `.crawljob` files on this machine, the same ones the
+  watched folder accepts.
 - Panels keep a space before their border, so nothing reads as if it had
   been cut off. Two key descriptions that filled the column exactly are
   shorter.

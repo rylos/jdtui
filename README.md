@@ -188,6 +188,8 @@ jdtui grabber                   # what is waiting to be confirmed
 jdtui devices                   # the JDownloaders on the account
 jdtui start | stop | pause | resume
 jdtui add https://example.com/file --package Ubuntu --folder /data --autostart
+jdtui add links.dlc             # a container, sent to JDownloader whole
+jdtui add jobs.crawljob         # read here, sent as the jobs it describes
 cat urls.txt | jdtui add        # reads stdin when given no urls
 ```
 
@@ -198,6 +200,11 @@ jdtui status --json | jq -r '"\(.device): \(.state)"'
 jdtui status --json | jq -e .running >/dev/null && echo "busy"
 jdtui downloads --json | jq -r '.[] | select(.finished) | .name'
 ```
+
+An argument that names a file on this machine is sent as a file rather than
+as a url: `.dlc`, `.ccf` and `.rsdf` containers go to JDownloader whole, and
+a `.crawljob` is read here and sent as the jobs it describes, with the
+options above filling in whatever the job leaves unsaid.
 
 `--device` picks the JDownloader by name or id, whatever the config says.
 Nothing is ever asked interactively, so the account has to be in the config
