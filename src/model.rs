@@ -481,7 +481,7 @@ impl Field {
 /// A small vertical form: text fields, one choice field and flags.
 #[derive(Debug, Clone)]
 pub struct Form {
-    pub title: &'static str,
+    pub title: String,
     pub fields: Vec<Field>,
     pub index: usize,
 }
@@ -490,7 +490,7 @@ impl Form {
     pub fn login(email: &str) -> Self {
         let email_field = Field::text("Email", "your My.JDownloader account").with_text(email);
         Form {
-            title: "Sign in to My.JDownloader",
+            title: "Sign in to My.JDownloader".into(),
             fields: vec![email_field, Field::secret("Password")],
             index: if email.is_empty() { 0 } else { 1 },
         }
@@ -498,7 +498,7 @@ impl Form {
 
     pub fn add_links() -> Self {
         Form {
-            title: "Add links to the Link Grabber",
+            title: "Add links to the Link Grabber".into(),
             fields: vec![
                 Field::text("Links", "one or more urls, separated by spaces"),
                 Field::text("Package name", "leave empty for automatic"),
@@ -528,30 +528,37 @@ impl Form {
 
     pub fn rename(current: &str) -> Self {
         let name = Field::text("Name", "").with_text(current);
-        Form { title: "Rename", fields: vec![name], index: 0 }
+        Form { title: "Rename".into(), fields: vec![name], index: 0 }
     }
 
     pub fn directory(current: &str) -> Self {
         let dir = Field::text("Save to", "absolute path on the JDownloader machine").with_text(current);
-        Form { title: "Download folder", fields: vec![dir], index: 0 }
+        Form { title: "Download folder".into(), fields: vec![dir], index: 0 }
     }
 
     pub fn archive_password() -> Self {
         Form {
-            title: "Add an archive password",
+            title: "Add an archive password".into(),
             fields: vec![Field::text("Password", "added to the list JDownloader tries on every archive")],
             index: 0,
         }
     }
 
+    /// One field for one setting of the Options panel. The title carries
+    /// the setting's own label, so the panel needs no other heading.
+    pub fn setting(label: &str, hint: &'static str, current: &str) -> Self {
+        let field = Field::text("Value", hint).with_text(current);
+        Form { title: label.to_string(), fields: vec![field], index: 0 }
+    }
+
     pub fn filter(current: &str) -> Self {
         let field = Field::text("Filter", "name, hoster or status; case does not matter").with_text(current);
-        Form { title: "Filter the list", fields: vec![field], index: 0 }
+        Form { title: "Filter the list".into(), fields: vec![field], index: 0 }
     }
 
     pub fn new_package() -> Self {
         Form {
-            title: "Move to a new package",
+            title: "Move to a new package".into(),
             fields: vec![
                 Field::text("Package name", ""),
                 Field::text("Save to", "leave empty to keep the current folder"),

@@ -9,7 +9,10 @@
 use std::fmt::Write as _;
 use std::fs;
 
-use jdtui::api::{About, Account, ArchiveStatus, Link, Package, RemoveMode, Snapshot, StorageInfo, SystemInfo};
+use jdtui::api::{
+    About, Account, ArchiveStatus, ConfigEntry, EnumOption, Link, Package, RemoveMode, Snapshot, StorageInfo,
+    SystemInfo,
+};
 use jdtui::app::{App, Mode};
 use jdtui::model::{Action, Form, Tab, build_rows, context_menu};
 use jdtui::ui;
@@ -149,6 +152,11 @@ fn to_svg(buffer: &Buffer) -> String {
     }
     svg.push_str("</svg>\n");
     svg
+}
+
+/// Shorthand for the demo setting values below.
+fn json<T: Into<serde_json::Value>>(value: T) -> serde_json::Value {
+    value.into()
 }
 
 fn shot(name: &str, app: &App) {
@@ -503,6 +511,64 @@ fn main() {
     });
     app.mode = Mode::About;
     shot("about", &app);
+
+    // The curated settings of the JDownloader.
+    let mut app = base();
+    let setting = |interface: &str, key: &str, kind: &str, java: Option<&str>, value, default| ConfigEntry {
+        interface_name: interface.into(),
+        key: key.into(),
+        abstract_type: Some(kind.into()),
+        kind: java.map(str::to_string),
+        value: Some(value),
+        default_value: Some(default),
+        ..Default::default()
+    };
+    let general = "org.jdownloader.settings.GeneralSettings";
+    let grabber = "org.jdownloader.gui.views.linkgrabber.addlinksdialog.LinkgrabberSettings";
+    let extraction = "org.jdownloader.extensions.extraction.ExtractionConfig";
+    app.options = jdtui::options::collect(vec![
+        setting(general, "MaxSimultaneDownloads", "INT", None, json(5), json(3)),
+        setting(general, "MaxDownloadsPerHostEnabled", "BOOLEAN", None, json(false), json(false)),
+        setting(general, "MaxSimultaneDownloadsPerHost", "INT", None, json(1), json(1)),
+        setting(general, "MaxChunksPerFile", "INT", None, json(5), json(1)),
+        setting(general, "DownloadSpeedLimitEnabled", "BOOLEAN", None, json(true), json(false)),
+        setting(general, "DownloadSpeedLimit", "INT", None, json(5_242_880), json(51200)),
+        setting(general, "MaxPluginRetries", "INT", None, json(3), json(3)),
+        setting(general, "ForcedFreeSpaceOnDisk", "INT", None, json(2048), json(128)),
+        setting(general, "IfFileExistsAction", "ENUM", Some("IfFileExistsAction"), json("SKIP_FILE"), json("ASK")),
+        setting(general, "AutoStartDownloadOption", "ENUM", Some("AutoStart"), json("ALWAYS"), json("ALWAYS")),
+        setting(general, "DefaultDownloadFolder", "STRING", None, json("/downloads"), json("/config/Downloads")),
+        setting(grabber, "LinkgrabberAutoStartEnabled", "BOOLEAN", None, json(true), json(true)),
+        setting(grabber, "AutoConfirmManagerAutoStart", "ENUM", Some("Confirm"), json("AUTO"), json("AUTO")),
+        setting(grabber, "AutoExtractionEnabled", "BOOLEAN", None, json(true), json(true)),
+        setting(extraction, "DeepExtractionEnabled", "BOOLEAN", None, json(true), json(true)),
+        setting(extraction, "AskForUnknownPasswordsEnabled", "BOOLEAN", None, json(false), json(true)),
+        setting(
+            extraction,
+            "DeleteArchiveFilesAfterExtractionAction",
+            "ENUM",
+            Some("Delete"),
+            json("NULL"),
+            json("NULL"),
+        ),
+        setting(extraction, "DeleteArchiveDownloadlinksAfterExtraction", "BOOLEAN", None, json(false), json(false)),
+        setting(extraction, "CustomExtractionPathEnabled", "BOOLEAN", None, json(false), json(false)),
+        setting(
+            extraction,
+            "CustomExtractionPath",
+            "STRING",
+            None,
+            json("/downloads/extracted"),
+            serde_json::Value::Null,
+        ),
+    ]);
+    let label = |name: &str, shown: &str| EnumOption { name: name.into(), label: Some(shown.into()) };
+    app.option_enums.insert("IfFileExistsAction".into(), vec![label("SKIP_FILE", "Skip the file")]);
+    app.option_enums.insert("Confirm".into(), vec![label("AUTO", "Automatic, by the quick settings")]);
+    app.option_enums.insert("Delete".into(), vec![label("NULL", "Delete no files")]);
+    app.option_index = 5;
+    app.mode = Mode::Options;
+    shot("options", &app);
 
     // The key reference.
     let mut app = base();

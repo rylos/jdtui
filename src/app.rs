@@ -1,16 +1,19 @@
 //! Application state and key handling. Drawing lives in `ui.rs`.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::api::{About, Account, AddLinks, FolderPolicy, JdApi, LinkVariant, RemoveMode, Snapshot, describe_error};
+use crate::api::{
+    About, Account, AddLinks, EnumOption, FolderPolicy, JdApi, LinkVariant, RemoveMode, Snapshot, describe_error,
+};
 use crate::config::Config;
 use crate::model::{
     Action, Form, MenuEntry, PRIORITIES, Row, RowKey, Tab, build_rows, collect_ids, context_menu, describe,
     device_menu, packages_of, row_key, row_name, row_priority, row_stop_marked, stop_mark_target,
 };
 use crate::myjd::{Device, MyJd};
+use crate::options::{Edit, Setting};
 use crate::poller::{EventSource, Poller, Update};
 
 /// Offered in the order the GUI lists them: safest first.
@@ -66,6 +69,14 @@ pub enum Mode {
     DeviceMenu,
     /// The JDownloader and the machine under it, in `about`.
     About,
+    /// The curated settings of the JDownloader, in `options`.
+    Options,
+    /// Picking a value for the ENUM setting under the cursor, from
+    /// `option_choices`.
+    OptionChoice,
+    /// Typing a number or a path for the setting under the cursor, in
+    /// `form`.
+    OptionEdit,
 }
 
 /// Every key of the main screen, grouped for the help panel. The README's
@@ -114,6 +125,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
         &[
             ("s", "Start / stop downloads"),
             ("p", "Pause / resume downloads"),
+            ("o", "Settings of the JDownloader"),
             ("A", "Accounts: enable, disable, refresh"),
             ("D", "About, captchas, updates, restart, exit"),
             ("d", "Switch to another JDownloader"),
@@ -194,6 +206,16 @@ pub struct App {
     pub accounts: Vec<Account>,
     /// What the About panel shows, read when it opens.
     pub about: Option<About>,
+    /// The curated settings, read when the Options panel opens.
+    pub options: Vec<Setting>,
+    pub option_index: usize,
+    /// The choices of every ENUM setting seen so far, by Java type. They
+    /// carry JDownloader's own translations, so they are worth keeping for
+    /// as long as the device does not change.
+    pub option_enums: BTreeMap<String, Vec<EnumOption>>,
+    /// The choices offered by `Mode::OptionChoice`.
+    pub option_choices: Vec<EnumOption>,
+    pub option_choice_index: usize,
     pub account_index: usize,
     /// Text to put on the system clipboard at the next frame; the binary
     /// sends it as an OSC 52 sequence, the only way out of a remote shell.
@@ -241,6 +263,11 @@ impl App {
             urls: Vec::new(),
             accounts: Vec::new(),
             about: None,
+            options: Vec::new(),
+            option_index: 0,
+            option_enums: BTreeMap::new(),
+            option_choices: Vec::new(),
+            option_choice_index: 0,
             account_index: 0,
             clipboard: None,
             message: None,
@@ -290,6 +317,11 @@ impl App {
             urls: Vec::new(),
             accounts: Vec::new(),
             about: None,
+            options: Vec::new(),
+            option_index: 0,
+            option_enums: BTreeMap::new(),
+            option_choices: Vec::new(),
+            option_choice_index: 0,
             account_index: 0,
             clipboard: None,
             message: None,
@@ -846,6 +878,219 @@ impl App {
         }
     }
 
+    // --- options -------------------------------------------------------
+
+    /// Read the curated settings and open the panel. One call per interface
+    /// and one more for each kind of choice not seen yet, so the panel opens
+    /// on what the JDownloader really holds rather than on a guess.
+    fn open_options(&mut self) {
+        let known: Vec<String> = self.option_enums.keys().cloned().collect();
+        let read = self.with_api(|api| {
+            let mut entries = Vec::new();
+            for interface in crate::options::INTERFACES {
+                // The pattern is matched against `interfaceName.key`, so it
+                // has to be loose on both sides.
+                entries.extend(api.config_list(&format!(".*{interface}.*"))?);
+            }
+            let settings = crate::options::collect(entries);
+            let mut enums: Vec<(String, Vec<EnumOption>)> = Vec::new();
+            for setting in &settings {
+                if setting.edit() != Edit::Choice {
+                    continue;
+                }
+                let Some(kind) = setting.entry.kind.clone() else { continue };
+                if known.contains(&kind) || enums.iter().any(|(k, _)| *k == kind) {
+                    continue;
+                }
+                enums.push((kind.clone(), api.config_enum(&kind)?));
+            }
+            Ok((settings, enums))
+        });
+        match read {
+            Ok((settings, enums)) => {
+                self.option_enums.extend(enums);
+                self.option_index = self.option_index.min(settings.len().saturating_sub(1));
+                self.options = settings;
+                self.mode = Mode::Options;
+                self.message = None;
+            }
+            Err(e) => self.message = Some((format!("Could not read the settings: {e}"), true)),
+        }
+    }
+
+    fn handle_options_key(&mut self, key: Key) {
+        let n = self.options.len();
+        match key {
+            Key::Esc | Key::Char('q' | 'o') => {
+                self.mode = Mode::List;
+                self.message = None;
+            }
+            Key::Up | Key::Char('k') => self.option_index = self.option_index.saturating_sub(1),
+            Key::Down | Key::Char('j') => self.option_index = (self.option_index + 1).min(n.saturating_sub(1)),
+            Key::Home | Key::Char('g') => self.option_index = 0,
+            Key::End | Key::Char('G') => self.option_index = n.saturating_sub(1),
+            Key::PageUp => self.option_index = self.option_index.saturating_sub(self.page.get()),
+            Key::PageDown => self.option_index = (self.option_index + self.page.get()).min(n.saturating_sub(1)),
+            Key::Enter | Key::Char(' ') => self.edit_option(),
+            Key::Char('r') => self.reset_option(),
+            _ => {}
+        }
+    }
+
+    /// Act on the setting under the cursor: a boolean flips at once, the
+    /// rest opens the panel that fits it.
+    fn edit_option(&mut self) {
+        let Some(setting) = self.options.get(self.option_index) else { return };
+        match setting.edit() {
+            Edit::Toggle => {
+                let now = setting.entry.value.as_ref().and_then(|v| v.as_bool()).unwrap_or(false);
+                self.write_option(serde_json::json!(!now));
+            }
+            Edit::Choice => {
+                let Some(kind) = setting.entry.kind.clone() else { return };
+                let current = setting.entry.value.as_ref().and_then(|v| v.as_str()).unwrap_or_default().to_string();
+                let choices = match self.option_enums.get(&kind) {
+                    Some(choices) => choices.clone(),
+                    None => match self.with_api(|api| api.config_enum(&kind)) {
+                        Ok(choices) => {
+                            self.option_enums.insert(kind, choices.clone());
+                            choices
+                        }
+                        Err(e) => {
+                            self.message = Some((format!("Could not read the choices: {e}"), true));
+                            return;
+                        }
+                    },
+                };
+                if choices.is_empty() {
+                    self.message = Some(("This setting offers no choices".into(), true));
+                    return;
+                }
+                self.option_choice_index = choices.iter().position(|c| c.name == current).unwrap_or(0);
+                self.option_choices = choices;
+                self.mode = Mode::OptionChoice;
+            }
+            Edit::Number | Edit::Text => {
+                let hint = if setting.edit() == Edit::Number {
+                    match setting.spec.unit {
+                        crate::options::Unit::Speed => "bytes per second",
+                        crate::options::Unit::Megabytes => "whole megabytes",
+                        crate::options::Unit::None => "a whole number",
+                    }
+                } else {
+                    "an absolute path on the JDownloader machine"
+                };
+                let current = match &setting.entry.value {
+                    Some(v) => v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()),
+                    None => String::new(),
+                };
+                self.form = Some(Form::setting(setting.spec.label, hint, &current));
+                self.mode = Mode::OptionEdit;
+            }
+            Edit::ReadOnly => {
+                self.message = Some(("This setting is only shown here; change it in JDownloader".into(), true));
+            }
+        }
+    }
+
+    fn handle_option_choice_key(&mut self, key: Key) {
+        let n = self.option_choices.len();
+        match key {
+            Key::Esc | Key::Char('q') => {
+                self.mode = Mode::Options;
+                self.message = None;
+            }
+            Key::Up | Key::Char('k') => self.option_choice_index = self.option_choice_index.saturating_sub(1),
+            Key::Down | Key::Char('j') => {
+                self.option_choice_index = (self.option_choice_index + 1).min(n.saturating_sub(1))
+            }
+            Key::Enter | Key::Right | Key::Char(' ') => {
+                let Some(choice) = self.option_choices.get(self.option_choice_index) else { return };
+                let value = serde_json::json!(choice.name);
+                self.mode = Mode::Options;
+                self.write_option(value);
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_option_edit_key(&mut self, key: Key) {
+        match key {
+            Key::Esc => {
+                self.form = None;
+                self.mode = Mode::Options;
+                self.message = None;
+            }
+            Key::Enter => {
+                let Some(form) = &self.form else { return };
+                let typed = form.value("Value").trim().to_string();
+                let Some(setting) = self.options.get(self.option_index) else { return };
+                let value = if setting.edit() == Edit::Number {
+                    match typed.parse::<i64>() {
+                        Ok(n) => serde_json::json!(n),
+                        Err(_) => {
+                            self.message = Some((format!("'{typed}' is not a whole number"), true));
+                            return;
+                        }
+                    }
+                } else {
+                    serde_json::json!(typed)
+                };
+                self.form = None;
+                self.mode = Mode::Options;
+                self.write_option(value);
+            }
+            other => {
+                if let Some(form) = &mut self.form {
+                    form_edit(form, other);
+                }
+            }
+        }
+    }
+
+    /// Put the setting under the cursor back to what JDownloader ships.
+    fn reset_option(&mut self) {
+        let Some(setting) = self.options.get(self.option_index) else { return };
+        if setting.is_default() {
+            self.message = Some(("Already at the default".into(), false));
+            return;
+        }
+        let Some(default) = setting.entry.default_value.clone() else {
+            self.message = Some(("This setting has no default".into(), true));
+            return;
+        };
+        self.write_option(default);
+    }
+
+    /// Write the setting under the cursor and read it back, so the panel
+    /// shows what JDownloader kept rather than what was asked for: it
+    /// clamps some values and refuses others outright.
+    fn write_option(&mut self, value: serde_json::Value) {
+        let Some(setting) = self.options.get(self.option_index) else { return };
+        let (interface, storage, key, label) = (
+            setting.entry.interface_name.clone(),
+            setting.entry.storage_arg().to_string(),
+            setting.entry.key.clone(),
+            setting.spec.label.to_string(),
+        );
+        let written = self.with_api(|api| api.config_set(&interface, &storage, &key, &value));
+        match written {
+            Ok(true) => self.message = Some((format!("{label} changed"), false)),
+            Ok(false) => self.message = Some((format!("{label} was refused by JDownloader"), true)),
+            Err(e) => {
+                self.message = Some((format!("Could not change {label}: {e}"), true));
+                return;
+            }
+        }
+        let reread = self.with_api(|api| api.config_list(&format!(".*{interface}.{key}")));
+        if let Ok(entries) = reread
+            && let Some(fresh) = entries.into_iter().find(|e| e.interface_name == interface && e.key == key)
+            && let Some(setting) = self.options.get_mut(self.option_index)
+        {
+            setting.entry = fresh;
+        }
+    }
+
     /// Fetch the variants of the link under the cursor and open the chooser
     /// on the current one.
     fn open_variants(&mut self) {
@@ -1055,6 +1300,9 @@ impl App {
                     }
                 }
                 Mode::Accounts => self.handle_accounts_key(key),
+                Mode::Options => self.handle_options_key(key),
+                Mode::OptionChoice => self.handle_option_choice_key(key),
+                Mode::OptionEdit => self.handle_option_edit_key(key),
                 Mode::About => {
                     if matches!(key, Key::Esc | Key::Enter | Key::Char('q')) {
                         self.mode = Mode::List;
@@ -1192,6 +1440,7 @@ impl App {
             Key::Char('p') => self.toggle_pause(),
             Key::Char('t') if !self.tab.is_grabber() => self.toggle_stop_mark(),
             Key::Char('d') => self.choose_device(),
+            Key::Char('o') => self.open_options(),
             Key::Char('A') => self.open_accounts(),
             Key::Char('D') => self.open_device_menu(),
             Key::Char('e') => {

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- `o` opens a curated Settings panel: the twenty-odd settings of the
+  JDownloader that get touched while downloads are running, out of the two
+  thousand its advanced configuration holds. Types, values, defaults and the
+  translated wording of every choice come from the device, so a setting it
+  does not have is left out. `Enter` changes one, `r` puts it back to the
+  default, and every change is read back so the panel shows what JDownloader
+  kept rather than what was asked for.
+
 ## 1.6.0 — 2026-09-07
 
 - `jdtui add --autostart` takes an answer as well as standing alone:

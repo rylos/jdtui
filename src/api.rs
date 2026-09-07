@@ -243,6 +243,66 @@ pub struct About {
     pub direct: Option<String>,
 }
 
+/// One setting of JDownloader's advanced configuration, as `/config/list`
+/// reports it. `value` and `default_value` are whatever the setting holds,
+/// so they stay `Value`; `abstract_type` says how to edit it: BOOLEAN, INT,
+/// LONG, STRING, ENUM, and a handful of shapes jdtui does not offer.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigEntry {
+    pub interface_name: String,
+    pub key: String,
+    pub storage: Option<String>,
+    pub abstract_type: Option<String>,
+    /// The Java type. For an ENUM this is what `config_enum` takes.
+    #[serde(rename = "type")]
+    pub kind: Option<String>,
+    /// The developers' own one-line description, in English whatever the
+    /// language of the JDownloader.
+    pub docs: Option<String>,
+    pub value: Option<Value>,
+    pub default_value: Option<Value>,
+}
+
+impl ConfigEntry {
+    /// What `/config/get` and `/config/set` want as the storage argument:
+    /// the literal string "null" when the setting has no named storage.
+    pub fn storage_arg(&self) -> &str {
+        self.storage.as_deref().unwrap_or("null")
+    }
+}
+
+/// One choice of an ENUM setting. JDownloader translates `label` into the
+/// language it runs in, and leaves it out when it has no translation.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct EnumOption {
+    pub name: String,
+    pub label: Option<String>,
+}
+
+impl EnumOption {
+    /// JDownloader's own wording where it has one. Where it has none, the
+    /// constant is made readable rather than shown as
+    /// `ONLY_IF_EXIT_WITH_RUNNING_DOWNLOADS`.
+    pub fn shown(&self) -> String {
+        match &self.label {
+            Some(l) if !l.is_empty() => l.clone(),
+            _ => humanize(&self.name),
+        }
+    }
+}
+
+/// `ONLY_IF_EXIT_WITH_RUNNING_DOWNLOADS` reads as
+/// `Only if exit with running downloads`.
+fn humanize(name: &str) -> String {
+    let words = name.split('_').map(str::to_lowercase).collect::<Vec<_>>().join(" ");
+    let mut chars = words.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        None => words,
+    }
+}
+
 /// One notification from the JDownloader event channel.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Event {
@@ -337,6 +397,9 @@ const PROBE_TIMEOUT: Duration = Duration::from_millis(1000);
 /// How long to stay on the relay after no direct address answered. The
 /// probe blocks the refresh for up to `PROBE_TIMEOUT`, so not too often.
 const PROBE_RETRY: Duration = Duration::from_secs(300);
+/// Reading settings walks JDownloader's whole configuration on the device
+/// side and takes far longer than a list call, especially over the relay.
+const CONFIG_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// `host:port` as given in the config, with a scheme if it has none.
 fn base_url(address: &str) -> String {
@@ -707,6 +770,33 @@ impl JdApi {
 
     pub fn add_archive_password(&mut self, password: &str) -> Result<()> {
         self.call_unit("/extraction/addArchivePassword", &[json!(password)])
+    }
+
+    // --- advanced configuration -----------------------------------------
+
+    /// The settings whose `interfaceName.key` matches `pattern`, with their
+    /// values, defaults and descriptions.
+    ///
+    /// The unfiltered list is over two thousand entries and most of them
+    /// belong to single hoster plugins, so jdtui never asks for all of it:
+    /// `crate::options` names the handful it shows and this is called once
+    /// per interface.
+    pub fn config_list(&mut self, pattern: &str) -> Result<Vec<ConfigEntry>> {
+        self.call_long(
+            "/config/list",
+            &[json!(pattern), json!(true), json!(true), json!(true), json!(true)],
+            CONFIG_TIMEOUT,
+        )
+    }
+
+    /// Write one setting. The device answers whether it took it.
+    pub fn config_set(&mut self, interface: &str, storage: &str, key: &str, value: &Value) -> Result<bool> {
+        self.call_long("/config/set", &[json!(interface), json!(storage), json!(key), value.clone()], CONFIG_TIMEOUT)
+    }
+
+    /// The choices of an ENUM setting, named by its `kind`.
+    pub fn config_enum(&mut self, kind: &str) -> Result<Vec<EnumOption>> {
+        self.call_long("/config/listEnum", &[json!(kind)], CONFIG_TIMEOUT)
     }
 
     pub fn captchas(&mut self) -> Result<Vec<CaptchaJob>> {

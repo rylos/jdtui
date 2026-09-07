@@ -7,7 +7,7 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, BorderType, Cell, Clear, Paragraph, Row as TRow, Table, TableState, Tabs};
 
 use crate::api::{Link, Package};
-use crate::app::{App, HELP, Mode, Screen};
+use crate::app::{App, HELP, Mode, Screen, truncate};
 use crate::model::{
     Extraction, FieldKind, Form, PRIORITIES, Row, Tab, describe, extraction_of, row_enabled, row_key, row_stop_marked,
 };
@@ -152,7 +152,7 @@ fn panel(title: &str, subtitle: Option<&str>) -> Block<'static> {
 fn draw_login(frame: &mut Frame, form: &Form, error: Option<&str>) {
     let area = centered(frame.area(), 64, 9 + error.is_some() as u16);
     frame.render_widget(Clear, area);
-    let block = panel(form.title, Some("Enter sign in · Tab next field · Esc quit"));
+    let block = panel(&form.title, Some("Enter sign in · Tab next field · Esc quit"));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -372,6 +372,27 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         (area, None)
     };
 
+    if matches!(app.mode, Mode::Options | Mode::OptionChoice | Mode::OptionEdit) {
+        draw_list(frame, app, list_area);
+        draw_options(frame, app, area);
+        if app.mode == Mode::OptionChoice {
+            draw_option_choice(frame, app, area);
+        }
+        if app.mode == Mode::OptionEdit
+            && let Some(form) = &app.form
+        {
+            let popup = centered(area, 70, 6);
+            frame.render_widget(Clear, popup);
+            let block = panel(&form.title, Some("Enter apply · Ctrl-U clear · Esc cancel"));
+            let inner = block.inner(popup);
+            frame.render_widget(block, popup);
+            let mut lines = vec![Line::raw("")];
+            lines.extend(form_lines(form));
+            frame.render_widget(Paragraph::new(lines), padded(inner));
+        }
+        return;
+    }
+
     if matches!(
         app.mode,
         Mode::Add | Mode::Rename | Mode::Directory | Mode::NewPackage | Mode::ArchivePassword | Mode::Filter
@@ -406,7 +427,7 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
             Mode::Filter => "Enter keep · Esc clear",
             _ => "Enter apply · ←→ Home End move · Ctrl-U clear · Esc cancel",
         };
-        let block = panel(form.title, Some(hint));
+        let block = panel(&form.title, Some(hint));
         let inner = block.inner(popup);
         frame.render_widget(block, popup);
         let mut lines = vec![Line::raw("")];
@@ -1223,6 +1244,119 @@ fn draw_accounts(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(table, inner);
 }
 
+/// The curated settings of the JDownloader, in the order `options.rs`
+/// lists them. Sections are headings rather than rows, so the cursor only
+/// ever lands on something that can be changed.
+fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
+    let popup = centered(area, area.width.saturating_sub(6).min(96), area.height);
+    frame.render_widget(Clear, popup);
+    let hint = "Enter change · r default · ↑↓ move · Esc close";
+    let block = panel("Settings", Some(hint));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    if app.options.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Line::from(" This JDownloader reported none of these settings").dim().italic()),
+            padded(inner),
+        );
+        return;
+    }
+
+    // The note of the highlighted setting sits at the foot of the panel, so
+    // the list above it is one line shorter.
+    let note_height = 2;
+    let list_height = inner.height.saturating_sub(note_height) as usize;
+
+    let mut lines: Vec<Line> = Vec::new();
+    // Which setting each line belongs to; headings belong to none.
+    let mut owner: Vec<Option<usize>> = Vec::new();
+    let label_width = 34usize;
+    let mut section = "";
+    for (i, setting) in app.options.iter().enumerate() {
+        if setting.spec.section != section {
+            section = setting.spec.section;
+            if !lines.is_empty() {
+                lines.push(Line::raw(""));
+                owner.push(None);
+            }
+            lines.push(Line::from(Span::styled(format!(" {section}"), Style::new().bold().fg(accent()))));
+            owner.push(None);
+        }
+        let selected = i == app.option_index;
+        let value = setting.shown(&app.option_enums);
+        let value_style = match setting.edit() {
+            crate::options::Edit::Toggle if value == "on" => Style::new().fg(Color::Green),
+            crate::options::Edit::Toggle => Style::new().fg(Color::DarkGray),
+            crate::options::Edit::ReadOnly => Style::new().dim(),
+            _ => Style::new().fg(Color::Yellow),
+        };
+        let mut spans = vec![
+            Span::raw(format!("  {} ", if selected { "›" } else { " " })),
+            Span::raw(format!("{:<label_width$}", truncate(setting.spec.label, label_width))),
+            Span::styled(truncate(&value, 40), value_style),
+        ];
+        if !setting.is_default() {
+            spans.push(Span::styled("  ·", Style::new().dim()));
+        }
+        let mut line = Line::from(spans);
+        if selected {
+            line = line.style(selected_style());
+        }
+        lines.push(line);
+        owner.push(Some(i));
+    }
+
+    // Scroll so the highlighted row stays on screen, keeping its heading
+    // visible when it can.
+    let cursor_line = owner.iter().position(|o| *o == Some(app.option_index)).unwrap_or(0);
+    let offset = if lines.len() <= list_height || cursor_line < list_height {
+        0
+    } else {
+        (cursor_line + 1 + list_height / 4).saturating_sub(list_height).min(lines.len() - list_height)
+    };
+    let shown: Vec<Line> = lines.into_iter().skip(offset).take(list_height).collect();
+    let list_area = Rect { height: list_height as u16, ..inner };
+    frame.render_widget(Paragraph::new(shown), padded(list_area));
+
+    // The note of the highlighted setting, and what JDownloader ships when
+    // it has been changed: that is what the `·` beside the value means.
+    let mut note = vec![Span::raw("  ")];
+    if let Some(setting) = app.options.get(app.option_index) {
+        note.push(Span::styled(setting.spec.note, Style::new().dim()));
+        if !setting.is_default() {
+            note.push(Span::styled(
+                format!("  ·  default {}", setting.shown_default(&app.option_enums)),
+                Style::new().dim().italic(),
+            ));
+        }
+    }
+    let note_area = Rect { y: inner.y + list_height as u16, height: note_height, ..inner };
+    frame.render_widget(Paragraph::new(vec![Line::raw(""), Line::from(note)]), padded(note_area));
+}
+
+/// The choices of the ENUM setting under the cursor, in JDownloader's own
+/// wording: it translates these, so they read as they do in its settings.
+fn draw_option_choice(frame: &mut Frame, app: &App, area: Rect) {
+    let n = app.option_choices.len();
+    let popup = centered(area, 56, (n as u16 + 4).min(area.height));
+    frame.render_widget(Clear, popup);
+    let title = app.options.get(app.option_index).map(|s| s.spec.label).unwrap_or("Choose");
+    let block = panel(title, Some("Enter apply · Esc cancel"));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    let lines: Vec<Line> = app
+        .option_choices
+        .iter()
+        .enumerate()
+        .map(|(i, choice)| {
+            let selected = i == app.option_choice_index;
+            let line = Line::from(format!("  {} {}", if selected { "›" } else { " " }, choice.shown()));
+            if selected { line.style(selected_style()) } else { line }
+        })
+        .collect();
+    frame.render_widget(Paragraph::new(lines), padded(inner));
+}
+
 fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
     let line = match (&app.mode, &app.message) {
         (Mode::Confirm(_), Some((m, _))) => Line::from(Span::styled(m.clone(), Style::new().fg(Color::Yellow).bold())),
@@ -1327,6 +1461,65 @@ mod tests {
         assert!(shows(&app, "Show S01"));
         assert!(shows(&app, "Extraction OK"));
         assert!(shows(&app, "Downloads (1)"));
+    }
+
+    /// A few curated settings as a device would report them.
+    fn options() -> Vec<crate::options::Setting> {
+        use crate::api::ConfigEntry;
+        use serde_json::json;
+        let entry = |interface: &str, key: &str, kind: &str, value, default| ConfigEntry {
+            interface_name: interface.into(),
+            key: key.into(),
+            abstract_type: Some(kind.into()),
+            value: Some(value),
+            default_value: Some(default),
+            ..Default::default()
+        };
+        let general = "org.jdownloader.settings.GeneralSettings";
+        crate::options::collect(vec![
+            entry(general, "MaxSimultaneDownloads", "INT", json!(5), json!(3)),
+            entry(general, "DownloadSpeedLimitEnabled", "BOOLEAN", json!(false), json!(false)),
+            entry(general, "DownloadSpeedLimit", "INT", json!(10240), json!(51200)),
+            entry(general, "DefaultDownloadFolder", "STRING", json!("/output"), json!("/config/Downloads")),
+        ])
+    }
+
+    #[test]
+    fn the_settings_panel_shows_labels_and_values() {
+        let mut app = App::with_snapshot(sample());
+        app.options = options();
+        app.mode = crate::app::Mode::Options;
+        assert!(shows(&app, "Settings"));
+        assert!(shows(&app, "Downloads"), "the section heading");
+        assert!(shows(&app, "Simultaneous downloads"));
+        assert!(shows(&app, "10.00 KB/s"), "a speed is shown in its unit, not in bytes");
+        assert!(shows(&app, "/output"));
+        assert!(shows(&app, "How many files download at the same time"), "the note of the highlighted setting");
+    }
+
+    #[test]
+    fn a_setting_left_at_its_default_carries_no_mark() {
+        let mut app = App::with_snapshot(sample());
+        app.options = options();
+        app.mode = crate::app::Mode::Options;
+        let rows = render(&app);
+        let limit = rows.iter().find(|r| r.contains("Speed limit ")).expect("the row");
+        assert!(!limit.contains('·'), "unchanged settings are not marked: {limit}");
+        let simultaneous = rows.iter().find(|r| r.contains("Simultaneous downloads")).expect("the row");
+        assert!(simultaneous.contains('·'), "a changed setting is marked: {simultaneous}");
+    }
+
+    #[test]
+    fn choosing_a_value_shows_jdownloaders_own_wording() {
+        let mut app = App::with_snapshot(sample());
+        app.options = options();
+        app.mode = crate::app::Mode::OptionChoice;
+        app.option_choices = vec![
+            crate::api::EnumOption { name: "SKIP_FILE".into(), label: Some("Salta file".into()) },
+            crate::api::EnumOption { name: "OVERWRITE_FILE".into(), label: None },
+        ];
+        assert!(shows(&app, "Salta file"), "a translated choice");
+        assert!(shows(&app, "Overwrite file"), "an untranslated one is made readable");
     }
 
     #[test]

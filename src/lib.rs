@@ -9,6 +9,7 @@ pub mod cli;
 pub mod config;
 pub mod model;
 pub mod myjd;
+pub mod options;
 pub mod poller;
 pub mod ui;
 pub mod watch;

@@ -129,6 +129,31 @@ expiry, and lets you enable, disable or refresh them.
 
 ![The accounts panel](docs/accounts.png)
 
+### Settings
+
+`o` opens the settings of the JDownloader you are connected to. Not all of
+them: its advanced configuration holds over two thousand entries across more
+than two hundred interfaces, most of them belonging to a single hoster plugin,
+and mirroring that in a terminal would help nobody. What is here is the
+twenty-odd that get touched while downloads are running — how many files at
+once, how many per host, chunks, the speed limit, what happens when a file is
+already there, where packages land, and what the extraction does with archives
+once it has unpacked them.
+
+Everything on the panel comes from the device: the type, the value, the
+default and, for a list of choices, JDownloader's own translated wording. A
+setting the JDownloader does not have simply does not appear, and one that has
+been changed from the default carries a `·`, with the default itself named at
+the foot of the panel. `Enter` changes the setting under the cursor — a
+toggle flips, a number or a path opens a field, a choice opens a list — and
+`r` puts it back to what JDownloader ships. Every change is written and then
+read back, so what you see is what JDownloader kept, not what was asked for.
+
+![The settings panel](docs/options.png)
+
+For anything outside this list, use JDownloader's own settings; jdtui does not
+try to replace them.
+
 ### The JDownloader itself
 
 `D` opens a menu on the JDownloader you are connected to: about it, check for
@@ -171,6 +196,7 @@ questions worth asking when something looks wrong.
 | `x` | Abort link crawling |
 | `s` | Start / stop downloads |
 | `p` | Pause / resume downloads |
+| `o` | Settings of the JDownloader |
 | `A` | Premium accounts: enable, disable, refresh |
 | `D` | The JDownloader itself: captchas, updates, restart, reconnect, exit |
 | `d` | Switch to another JDownloader of the account |
