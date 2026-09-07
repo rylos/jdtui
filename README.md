@@ -1,5 +1,7 @@
 # jdtui
 
+[![Built With Ratatui](https://ratatui.rs/built-with-ratatui/badge.svg)](https://ratatui.rs/)
+
 A terminal UI for [JDownloader 2](https://jdownloader.org/), talking to it through
 the [My.JDownloader](https://my.jdownloader.org/) API.
 
