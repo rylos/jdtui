@@ -26,6 +26,13 @@ pub struct Config {
     /// answers (default true), as the web interface does; the relay is the
     /// fallback either way.
     pub direct: Option<bool>,
+    /// A folder on this machine watched for `.crawljob` files and
+    /// containers: by `jdtui watch` when it is given none, and by the
+    /// interface itself while it is open.
+    pub watch_folder: Option<String>,
+    /// Whether the folder above is watched at all (default true). Set it
+    /// to false to stop without forgetting the path.
+    pub watch: Option<bool>,
     /// Addresses to try besides those JDownloader reports, `host:port`,
     /// for a JDownloader that does not know how it is reached (a Docker
     /// container sees its own address only).
@@ -81,6 +88,15 @@ impl Config {
 
     pub fn events(&self) -> bool {
         self.events.unwrap_or(true)
+    }
+
+    /// The folder to watch, or `None` when none is set or watching is
+    /// switched off.
+    pub fn watch_folder(&self) -> Option<PathBuf> {
+        if !self.watch.unwrap_or(true) {
+            return None;
+        }
+        self.watch_folder.as_ref().filter(|f| !f.trim().is_empty()).map(PathBuf::from)
     }
 
     /// The extra addresses to try for `device` (its name), or `None` when
@@ -153,6 +169,19 @@ mod tests {
         let back = parse(&written);
         assert_eq!(back.direct_for("jd2@home").as_deref(), Some(["192.168.1.20:3129".to_string()].as_slice()));
         assert_eq!(back.device.as_deref(), Some("abc"));
+    }
+
+    #[test]
+    fn the_watched_folder_can_be_switched_off_without_forgetting_it() {
+        let watching = parse("watch_folder = \"/home/me/inbox\"");
+        assert_eq!(watching.watch_folder(), Some(PathBuf::from("/home/me/inbox")));
+
+        let off = parse("watch_folder = \"/home/me/inbox\"\nwatch = false");
+        assert_eq!(off.watch_folder(), None, "the path stays in the file, the watching stops");
+        assert!(off.watch_folder.is_some(), "and the path is still there to switch back on");
+
+        assert_eq!(parse("").watch_folder(), None);
+        assert_eq!(parse("watch_folder = \"   \"").watch_folder(), None);
     }
 
     #[test]

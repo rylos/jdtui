@@ -1085,7 +1085,7 @@ fn draw_about(frame: &mut Frame, app: &App, area: Rect) {
     lines.push(Line::from(vec![
         label("Calls go"),
         match &about.direct {
-            Some(address) => Span::styled(format!("straight to {address}"), Style::new().fg(Color::Green)),
+            Some(address) => Span::styled(format!("direct to {address}"), Style::new().fg(Color::Green)),
             None => Span::raw("through the My.JDownloader relay"),
         },
     ]));
@@ -1385,7 +1385,7 @@ mod tests {
         assert!(shows(&app, "core revision 50639"));
         assert!(shows(&app, "2d 0h 0m"));
         assert!(shows(&app, "in a container"));
-        assert!(shows(&app, "straight to http://192.168.1.30:3129"));
+        assert!(shows(&app, "direct to http://192.168.1.30:3129"));
         assert!(shows(&app, "an update is waiting"));
         assert!(shows(&app, "1.00 GB free of 4.00 GB"));
     }

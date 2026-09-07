@@ -387,7 +387,7 @@ impl App {
         jd.set_direct_config(direct.is_some(), direct.unwrap_or_default());
         let api = Arc::new(Mutex::new(jd));
         let period = Duration::from_millis(self.config.refresh_ms());
-        self.poller = Some(Poller::start(api.clone(), period, events));
+        self.poller = Some(Poller::start(api.clone(), period, events, self.config.watch_folder()));
         self.api = Some(api);
         self.screen = Screen::Main;
     }
@@ -406,13 +406,29 @@ impl App {
         }
     }
 
+    /// Say what came out of the watched folder. A failure is worth
+    /// showing on its own; a success is a count.
+    fn report_watched(&mut self, outcomes: &[crate::watch::Outcome]) {
+        let failed: Vec<&crate::watch::Outcome> = outcomes.iter().filter(|o| o.result.is_err()).collect();
+        if let Some(first) = failed.first() {
+            let reason = first.result.as_ref().err().cloned().unwrap_or_default();
+            let more = if failed.len() > 1 { format!(" (and {} more)", failed.len() - 1) } else { String::new() };
+            self.message = Some((format!("{}: {reason}{more}", first.file), true));
+            return;
+        }
+        let sent = outcomes.len();
+        self.message = Some((format!("Watched folder: {sent} file(s) handed to JDownloader"), false));
+    }
+
     /// Drain what the poller produced since the last frame.
     pub fn tick(&mut self) {
         let Some(poller) = &self.poller else { return };
         let mut latest = None;
+        let mut watched: Vec<crate::watch::Outcome> = Vec::new();
         while let Some(update) = poller.try_recv() {
             match update {
                 Update::Events(live) => self.events_live = live,
+                Update::Watched(outcomes) => watched.extend(outcomes),
                 other => latest = Some(other),
             }
         }
@@ -423,7 +439,12 @@ impl App {
                 self.rebuild_rows();
             }
             Some(Update::Error(e)) => self.refresh_error = Some(e),
-            Some(Update::Events(_)) | None => {}
+            Some(Update::Events(_) | Update::Watched(_)) | None => {}
+        }
+        // After the snapshot, so the news of the folder is what stays on
+        // screen rather than being overwritten by it.
+        if !watched.is_empty() {
+            self.report_watched(&watched);
         }
     }
 

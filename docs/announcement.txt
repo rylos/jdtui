@@ -51,7 +51,8 @@ split across a Downloads and a Link Grabber tab.
 - it can watch a folder on the machine it runs on and hand what is dropped
   there to JDownloader, crawljob files and DLC/CCF/RSDF containers, which is
   the half of a folder watch JDownloader's own extension cannot do from the
-  other side of the network
+  other side of the network. Name the folder in the config and the interface
+  watches it in the background too
 - given a command instead of nothing, it answers on stdout and exits, so it
   fits in a script: status, downloads, grabber, devices, start/stop/pause,
   add, with --json for jq

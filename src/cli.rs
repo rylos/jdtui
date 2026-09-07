@@ -63,8 +63,9 @@ pub enum Command {
     /// is moved to `processed` beside it once JDownloader has taken it,
     /// or to `failed` if it would not.
     Watch {
-        /// The folder to watch.
-        folder: PathBuf,
+        /// The folder to watch. Falls back to `watch_folder` in the
+        /// config file when left out.
+        folder: Option<PathBuf>,
         /// Seconds between one look and the next.
         #[arg(long, default_value_t = 5)]
         interval: u64,
@@ -142,7 +143,7 @@ impl Status {
             println!("Captchas   {} waiting", self.captchas);
         }
         match &self.direct {
-            Some(address) => println!("Calls go   straight to {address}"),
+            Some(address) => println!("Calls go   direct to {address}"),
             None => println!("Calls go   through the My.JDownloader relay"),
         }
     }
@@ -218,14 +219,22 @@ pub fn run(command: Command, config: &Config, json: bool, device: Option<&str>) 
             done(json, "resumed");
         }
         Command::Watch { folder, interval, once } => {
+            let folder = match folder.or_else(|| config.watch_folder()) {
+                Some(f) => f,
+                None if config.watch_folder.is_some() => bail!(
+                    "watching is switched off in {} (watch = false); name a folder to watch it anyway",
+                    Config::path().display()
+                ),
+                None => bail!("no folder given and no watch_folder in {}", Config::path().display()),
+            };
             if once {
                 // Two looks with a pause between them: a file is only
                 // taken once it has stopped growing, and one look cannot
                 // tell that.
                 let mut seen = HashMap::new();
-                let mut sent = watch::sweep(&mut api, &folder, &mut seen)?;
+                let mut sent = watch::report(&watch::sweep(&mut api, &folder, &mut seen)?);
                 std::thread::sleep(watch::SETTLE);
-                sent += watch::sweep(&mut api, &folder, &mut seen)?;
+                sent += watch::report(&watch::sweep(&mut api, &folder, &mut seen)?);
                 if json {
                     println!("{}", serde_json::json!({ "sent": sent }));
                 } else {

@@ -73,8 +73,10 @@ events = true
 #
 # How it works: jdtui asks JDownloader which addresses it can be reached
 # at (the "direct connection" setting in JDownloader's My.JDownloader
-# options, LAN and/or WAN), pings them all at once and keeps the fastest
-# that answers. The payload is encrypted the same way either side of the
+# options, LAN and/or WAN), pings them all at once and keeps the best that
+# answers: IPv6 before IPv4, then the quickest. IPv6 comes first not for
+# speed but because an IPv4 address is often behind carrier-grade NAT,
+# where the address JDownloader believes it has may not lead back to it. The payload is encrypted the same way either side of the
 # relay, so nothing changes on the wire but the host it goes to. On a LAN
 # this turns a ~100 ms call into a ~5 ms one.
 #
@@ -87,6 +89,29 @@ events = true
 # relay.
 
 direct = true
+
+
+# --- A folder to watch -------------------------------------------------
+#
+# A folder on this machine to keep an eye on. Anything dropped in it is
+# handed to JDownloader: `.crawljob` files, in either shape JDownloader's
+# own Folder Watch accepts, and `.dlc`, `.ccf` and `.rsdf` containers.
+#
+# It is used in two places: `jdtui watch` takes it when you name no folder
+# on the command line, and the interface watches it in the background while
+# it is open, looking every few seconds.
+#
+# Each file is moved into `processed` beside it once JDownloader has taken
+# it, or into `failed` if it would not, so nothing is ever sent twice.
+#
+# This folder is on the machine jdtui runs on. For a folder JDownloader can
+# reach by itself, its own Folder Watch extension is the better tool: it
+# needs no client running at all.
+
+watch_folder = "/home/you/jd-inbox"
+
+# Stop watching without forgetting the path above. Default true.
+watch = true
 
 
 # --- Extra addresses for the direct connection -------------------------

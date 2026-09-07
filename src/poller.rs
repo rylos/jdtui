@@ -13,6 +13,8 @@
 //! downloading, the periodic refresh stretches to `IDLE_PERIOD`: events
 //! cover the changes, and the relay sees far fewer calls.
 
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
@@ -21,10 +23,15 @@ use std::time::{Duration, Instant};
 
 use crate::api::{JdApi, SharedApi, Snapshot, Status, describe_error};
 use crate::myjd::MyJd;
+use crate::watch;
 
 const STATUS_EVERY: u32 = 5;
 /// Refresh period while events are flowing and nothing downloads.
 const IDLE_PERIOD: Duration = Duration::from_secs(30);
+/// While a folder is being watched, do not let the idle period stretch
+/// past this: a file dropped in it should be picked up while the person
+/// who dropped it is still looking.
+const WATCH_PERIOD: Duration = Duration::from_secs(5);
 /// Wait before opening the channel again after it failed.
 const RETRY_AFTER: Duration = Duration::from_secs(10);
 /// Least time between a refresh and the next one triggered by a wake.
@@ -35,6 +42,8 @@ pub enum Update {
     Error(String),
     /// The event channel came up or went down.
     Events(bool),
+    /// Files found in the watched folder and handed to JDownloader.
+    Watched(Vec<watch::Outcome>),
 }
 
 /// Credentials for the listener's own session.
@@ -60,7 +69,7 @@ pub struct Poller {
 }
 
 impl Poller {
-    pub fn start(api: SharedApi, period: Duration, events: Option<EventSource>) -> Self {
+    pub fn start(api: SharedApi, period: Duration, events: Option<EventSource>, watch_folder: Option<PathBuf>) -> Self {
         let (tx, rx) = channel::<Update>();
         let (wake_tx, wake_rx) = channel::<()>();
         let stop = Arc::new(AtomicBool::new(false));
@@ -79,8 +88,33 @@ impl Poller {
             let mut tick: u32 = 0;
             let mut woken = true;
             let mut running = true;
+            let mut seen: HashMap<PathBuf, u64> = HashMap::new();
+            // A folder that is missing or unreadable fails every sweep;
+            // say so once, not once a second.
+            let mut watch_complaint: Option<String> = None;
             while !stop_flag.load(Ordering::Relaxed) {
                 let started = Instant::now();
+                // The watched folder first: sending a file changes the
+                // lists, and the snapshot below then picks it up.
+                if let Some(folder) = &watch_folder
+                    && let Ok(mut a) = api.lock()
+                {
+                    match watch::sweep(&mut a, folder, &mut seen) {
+                        Ok(outcomes) => {
+                            watch_complaint = None;
+                            if !outcomes.is_empty() {
+                                let _ = tx.send(Update::Watched(outcomes));
+                            }
+                        }
+                        Err(e) => {
+                            let complaint = format!("watched folder: {e:#}");
+                            if watch_complaint.as_deref() != Some(complaint.as_str()) {
+                                let _ = tx.send(Update::Error(complaint.clone()));
+                                watch_complaint = Some(complaint);
+                            }
+                        }
+                    }
+                }
                 let result = api.lock().map(|mut a| {
                     // The api knows whether it wants a direct connection
                     // and which addresses belong to its device.
@@ -104,8 +138,11 @@ impl Poller {
                 tick = tick.wrapping_add(1);
                 // Sleep until the period elapses or someone asks for an
                 // early refresh: an action after it succeeds, or an event.
-                let wait =
+                let mut wait =
                     if events_alive.load(Ordering::Relaxed) && !running { period.max(IDLE_PERIOD) } else { period };
+                if watch_folder.is_some() {
+                    wait = wait.min(WATCH_PERIOD.max(period));
+                }
                 woken = wake_rx.recv_timeout(wait).is_ok();
                 if woken && started.elapsed() < WAKE_GAP {
                     // Events come in bursts: let them settle before refreshing.
@@ -240,6 +277,7 @@ mod live {
                     Update::Snapshot(s) => println!("  [update] snapshot: {} grabber packages", s.grabber.len()),
                     Update::Error(e) => println!("  [update] error: {e}"),
                     Update::Events(live) => println!("  [update] events live: {live}"),
+                    Update::Watched(o) => println!("  [update] watched folder: {} file(s)", o.len()),
                 }
                 if let Some(v) = f(u) {
                     return v;
@@ -268,7 +306,7 @@ mod live {
         if !old.is_empty() {
             other.remove(&[], &old, true).expect("remove leftovers");
         }
-        let poller = Poller::start(api, Duration::from_secs(60), Some(source));
+        let poller = Poller::start(api, Duration::from_secs(60), Some(source), None);
 
         // The channel and the first snapshot come up in either order.
         let (mut snapshot, mut channel) = (false, false);

@@ -213,7 +213,14 @@ opens itself.
 jdtui watch ~/jd-inbox                 # until Ctrl-C, looking every 5 seconds
 jdtui watch ~/jd-inbox --interval 30
 jdtui watch ~/jd-inbox --once          # sweep and exit, for cron
+jdtui watch                            # the folder named in the config
 ```
+
+Naming the folder in the config as `watch_folder` does two things: `jdtui
+watch` takes it when you give it none, and **the interface watches it too
+while it is open**, so a file dropped in it is picked up within a few seconds
+without a second program running. `watch = false` stops that without making
+you delete the path.
 
 Each file is moved to `processed` beside it once JDownloader has taken it, or
 to `failed` if it would not, so nothing is ever sent twice. A file is left

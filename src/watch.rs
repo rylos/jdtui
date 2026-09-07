@@ -234,10 +234,21 @@ fn send(api: &mut JdApi, path: &Path) -> Result<String> {
     Ok(format!("{count} job(s) added"))
 }
 
-/// Walk the folder once, sending whatever has settled. Returns how many
-/// files were sent.
-pub fn sweep(api: &mut JdApi, folder: &Path, seen: &mut HashMap<PathBuf, u64>) -> Result<usize> {
-    let mut sent = 0;
+/// What became of one file the sweep picked up. Nothing is printed here:
+/// the interface would be drawn over.
+#[derive(Debug, Clone)]
+pub struct Outcome {
+    /// The file as it was named when it arrived.
+    pub file: String,
+    /// What JDownloader did with it, or why it would not.
+    pub result: Result<String, String>,
+    /// Where the file was filed away.
+    pub moved_to: PathBuf,
+}
+
+/// Walk the folder once, sending whatever has settled.
+pub fn sweep(api: &mut JdApi, folder: &Path, seen: &mut HashMap<PathBuf, u64>) -> Result<Vec<Outcome>> {
+    let mut done = Vec::new();
     for path in candidates(folder)? {
         if !settled(&path, seen) {
             continue;
@@ -247,26 +258,36 @@ pub fn sweep(api: &mut JdApi, folder: &Path, seen: &mut HashMap<PathBuf, u64>) -
         // and moving after would send it twice if the move failed, and
         // on Windows a move fails for exactly the file another program
         // still holds open, which is the one we must not touch yet.
-        let claimed = match file_away(&path, folder, true) {
-            Ok(target) => target,
-            Err(e) => {
-                eprintln!("{name}: not taken this time ({e:#})");
-                continue;
-            }
+        let Ok(claimed) = file_away(&path, folder, true) else {
+            // Someone still holds it: leave it for the next sweep.
+            continue;
         };
-        match send(api, &claimed) {
-            Ok(what) => {
-                println!("{name}: {what}, moved to {}", claimed.display());
-                sent += 1;
-            }
+        let outcome = match send(api, &claimed) {
+            Ok(what) => Outcome { file: name, result: Ok(what), moved_to: claimed },
             Err(e) => {
                 let target = file_away(&claimed, folder, false).unwrap_or(claimed);
-                eprintln!("{name}: {e:#}, moved to {}", target.display());
+                Outcome { file: name, result: Err(format!("{e:#}")), moved_to: target }
             }
-        }
+        };
+        done.push(outcome);
         seen.remove(&path);
     }
-    Ok(sent)
+    Ok(done)
+}
+
+/// Say out loud what a sweep did, for the command line.
+pub fn report(outcomes: &[Outcome]) -> usize {
+    let mut sent = 0;
+    for outcome in outcomes {
+        match &outcome.result {
+            Ok(what) => {
+                println!("{}: {what}, moved to {}", outcome.file, outcome.moved_to.display());
+                sent += 1;
+            }
+            Err(why) => eprintln!("{}: {why}, moved to {}", outcome.file, outcome.moved_to.display()),
+        }
+    }
+    sent
 }
 
 /// Watch until interrupted, sweeping every `interval`.
@@ -277,8 +298,11 @@ pub fn watch(api: &mut JdApi, folder: &Path, interval: Duration) -> Result<()> {
     println!("Watching {} every {}s. Ctrl-C to stop.", folder.display(), interval.as_secs());
     let mut seen = HashMap::new();
     loop {
-        if let Err(e) = sweep(api, folder, &mut seen) {
-            eprintln!("sweep failed: {e:#}");
+        match sweep(api, folder, &mut seen) {
+            Ok(outcomes) => {
+                report(&outcomes);
+            }
+            Err(e) => eprintln!("sweep failed: {e:#}"),
         }
         std::thread::sleep(interval);
     }

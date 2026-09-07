@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-- `jdtui watch <folder>` sends what is dropped into a folder on this
+- `watch_folder` in the config names a folder to watch: `jdtui watch`
+  takes it when given none, and the interface watches it in the
+  background while it is open. `watch = false` stops that without
+  forgetting the path.
+- `jdtui watch [folder]` sends what is dropped into a folder on this
   machine to JDownloader, `.crawljob` files and `.dlc`, `.ccf`, `.rsdf`
   containers, filing each away afterwards. JDownloader cannot watch a
   folder it has no access to; this covers that. Suggested by the
