@@ -25,8 +25,8 @@ split across a Downloads and a Link Grabber tab.
   split by hoster, stop mark, remove
 - removing from the Downloads tab asks what to do with the files already on
   disk, the same three choices the desktop dialog offers
-- start/stop and pause, captchas and extraction in the header, video
-  variants in the Link Grabber, copy the urls of a selection
+- start/stop and pause, captchas and archives being unpacked in the header,
+  video variants in the Link Grabber, copy the urls of a selection
 - premium accounts: traffic, expiry, enable/disable/refresh
 - the JDownloader itself: update check, restart, reconnect
 - an add-links form with the fields of the GUI's dialog, properties panel,
@@ -34,6 +34,19 @@ split across a Downloads and a Link Grabber tab.
 - it listens to JDownloader's event channel, so links added from the browser
   or another client show up within a second or two, and it polls lightly
   while nothing downloads
+- it talks to JDownloader directly whenever it can reach it, the way the web
+  interface does: it asks JDownloader which addresses it answers on, pings
+  them all and keeps the fastest, and drops back to the relay by itself when
+  that route stops answering. On a LAN it turns a call of about 100 ms into
+  one of about 5 ms, and the header says which route is in use. A JDownloader
+  in a container only knows its own address, so extra ones can be named in
+  the config, per device
+- what a row is doing is put in jdtui's own words, worked out from the API
+  and not from JDownloader's status text, which is written in whatever
+  language JDownloader runs in: an archive being unpacked reads Extracting,
+  one that came out whole Extracted, a damaged one Extraction failed. The
+  colours follow the state as well, so a finished link and a downloading one
+  no longer look alike
 - switch between the JDownloader instances on the account without restarting
 - a single static binary, no runtime to install
 
@@ -41,7 +54,8 @@ Install with a Rust toolchain:
 
     cargo install --git https://github.com/rylos/jdtui
 
-or take the prebuilt Linux x86_64 binary from the releases page.
+or take the prebuilt Linux x86_64 binary from the releases page. Every setting
+is optional and documented in config.example.toml in the repository.
 
 The My.JDownloader protocol is implemented natively rather than through a
 library: request ids, HMAC-signed server calls, AES-CBC encrypted device calls,
