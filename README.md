@@ -13,11 +13,47 @@ connected to it.
 
 ## Install
 
+Download the binary for your machine from the [latest
+release](https://github.com/rylos/jdtui/releases/latest) — Linux, macOS and
+Windows, on Intel and ARM — put it somewhere on your `PATH`, and run it.
+
+Or build it yourself:
+
 ```bash
 cargo install --git https://github.com/rylos/jdtui
 ```
 
-A single static binary; no runtime, no Python, no local API to switch on.
+Either way it is a single binary: no runtime, no Python, no local API to
+switch on. The Linux builds are statically linked against musl, so they run
+on any distribution whatever its glibc.
+
+### Verifying a download
+
+Every release asset is signed with an SSH key that lives on the maintainer's
+machine and never goes near the build runners. The public half is
+[`.github/allowed_signers`](.github/allowed_signers), fingerprint
+`SHA256:A8FoTqTFZrY18WXrAuT1mA2xnmoc4xTDCNIzkQPRjdA`.
+
+```bash
+# Check that the file you downloaded is the file that was built,
+curl -LO https://github.com/rylos/jdtui/raw/main/.github/allowed_signers
+ssh-keygen -Y verify -f allowed_signers -I rylos78@gmail.com -n file \
+           -s SHA256SUMS.sig < SHA256SUMS
+# and that its checksum is the one that was signed.
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
+Each asset also carries its own `.sig`, verified the same way. The commits
+and tags are signed with the same key.
+
+### A new version
+
+jdtui asks GitHub once a day whether a newer one has been released, and says
+so in the About panel (`D`, then About) and once in the footer. It is the
+only thing jdtui says to anyone but My.JDownloader and the JDownloader
+itself: one unauthenticated request, answered from a cache on most runs, on
+its own thread, silent when it fails. `update_check = false` in the config
+turns it off for good.
 
 ## First run
 

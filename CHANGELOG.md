@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Binaries for Linux, macOS and Windows, on Intel and ARM, built by GitHub
+  Actions when a tag is pushed. The Linux ones are static musl builds, so
+  they run on any distribution whatever its glibc.
+- Releases, commits and tags are signed. The key stays on the maintainer's
+  machine — the runners build, `scripts/sign-release.sh` signs afterwards —
+  and its public half is in `.github/allowed_signers`, so a download can be
+  checked with `ssh-keygen -Y verify`.
+- jdtui asks GitHub once a day whether a newer version has been released and
+  says so in the About panel and once in the footer. `update_check = false`
+  turns it off; it is the only thing jdtui says to anyone but
+  My.JDownloader and the JDownloader itself.
+
 - The Settings panel reads in English throughout. JDownloader translates the
   labels of a list of choices into the language it runs in — and leaves them
   out altogether for some settings — so the panel now uses its own wording,

@@ -44,6 +44,8 @@ pub enum Update {
     Events(bool),
     /// Files found in the watched folder and handed to JDownloader.
     Watched(Vec<watch::Outcome>),
+    /// A newer jdtui has been released; the string is its version.
+    NewVersion(String),
 }
 
 /// Credentials for the listener's own session.
@@ -69,10 +71,28 @@ pub struct Poller {
 }
 
 impl Poller {
-    pub fn start(api: SharedApi, period: Duration, events: Option<EventSource>, watch_folder: Option<PathBuf>) -> Self {
+    pub fn start(
+        api: SharedApi,
+        period: Duration,
+        events: Option<EventSource>,
+        watch_folder: Option<PathBuf>,
+        update_check: bool,
+    ) -> Self {
         let (tx, rx) = channel::<Update>();
         let (wake_tx, wake_rx) = channel::<()>();
         let stop = Arc::new(AtomicBool::new(false));
+
+        // On its own thread and only once: it answers from a day-old cache
+        // most of the time, but the first run of the day would otherwise
+        // hold the first refresh up for as long as GitHub takes.
+        if update_check {
+            let tx = tx.clone();
+            thread::spawn(move || {
+                if let Some(version) = crate::update::newer_than(env!("CARGO_PKG_VERSION")) {
+                    let _ = tx.send(Update::NewVersion(version));
+                }
+            });
+        }
         let events_alive = Arc::new(AtomicBool::new(false));
 
         let device = events.map(|source| {
@@ -278,6 +298,7 @@ mod live {
                     Update::Error(e) => println!("  [update] error: {e}"),
                     Update::Events(live) => println!("  [update] events live: {live}"),
                     Update::Watched(o) => println!("  [update] watched folder: {} file(s)", o.len()),
+                    Update::NewVersion(v) => println!("  [update] jdtui {v} is out"),
                 }
                 if let Some(v) = f(u) {
                     return v;
@@ -306,7 +327,7 @@ mod live {
         if !old.is_empty() {
             other.remove(&[], &old, true).expect("remove leftovers");
         }
-        let poller = Poller::start(api, Duration::from_secs(60), Some(source), None);
+        let poller = Poller::start(api, Duration::from_secs(60), Some(source), None, false);
 
         // The channel and the first snapshot come up in either order.
         let (mut snapshot, mut channel) = (false, false);

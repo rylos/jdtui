@@ -1,7 +1,13 @@
-# Release procedure (as done for 1.0.0 and 1.1.0)
+# Release procedure
+
+Since 1.8.0 the binaries are built by GitHub Actions and signed locally.
 
 1. Bump `version` in Cargo.toml (Cargo.lock follows on build); rename the CHANGELOG.md "Unreleased" section to "X.Y.Z — date" (unreleased changes are collected there between releases); rework README if features changed; `cargo run --example screenshots`.
-2. Commit "Release X.Y.Z"; annotated tag `vX.Y.Z` whose message is the release notes (first line "jdtui X.Y.Z").
-3. `git push origin main --follow-tags`.
-4. GitHub release: `gh release create vX.Y.Z --title "jdtui X.Y.Z" --notes-file <notes>`.
-5. Asset, always expected: `cargo build --release`, copy `target/release/jdtui`, `strip` it, `tar czf jdtui-X.Y.Z-x86_64-linux.tar.gz jdtui` (binary at the archive root, nothing else), `gh release upload vX.Y.Z <tar.gz>`. Plain x86_64 glibc build, ~2 MB compressed.
+2. Commit "Release X.Y.Z"; annotated tag `vX.Y.Z` whose message is the release notes (first line "jdtui X.Y.Z"). Commits and tags are SSH-signed automatically (repo-local `gpg.format=ssh`, `user.signingkey=~/.ssh/id_rsa.pub`, `commit.gpgsign`/`tag.gpgsign`).
+3. `git push origin main --follow-tags`. This fires `.github/workflows/release.yml`: fmt + clippy + tests, then builds x86_64/aarch64 Linux (musl, static), x86_64/aarch64 macOS and x86_64 Windows, creates the release from the tag message if it does not exist, and uploads the archives plus SHA256SUMS.
+4. Wait for the run (`gh run watch`), then `scripts/sign-release.sh vX.Y.Z`: downloads the assets, checks them against SHA256SUMS, signs each with the SSH key HELD ONLY HERE (never in Actions secrets) and uploads the `.sig` files.
+5. Install locally: `cargo build --release && cp target/release/jdtui ~/.local/bin/`. Align pc-casa (`ssh -p 22222 marco@the-other-machine`).
+
+Asset names: `jdtui-X.Y.Z-{x86_64,aarch64}-{linux,macos}.tar.gz` (binary at the archive root) and `jdtui-X.Y.Z-x86_64-windows.zip`.
+
+The public half of the signing key is `.github/allowed_signers` (fingerprint SHA256:A8FoTqTFZrY18WXrAuT1mA2xnmoc4xTDCNIzkQPRjdA); the README explains verification. To register it on GitHub for the "Verified" badge the token needs a scope it does not have: `gh auth refresh -h github.com -s admin:ssh_signing_key`, then `gh api /user/ssh_signing_keys -f title=jdtui -f key="$(cat ~/.ssh/id_rsa.pub)"`.

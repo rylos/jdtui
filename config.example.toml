@@ -114,6 +114,22 @@ watch_folder = "/home/you/jd-inbox"
 watch = true
 
 
+# --- Looking for a new jdtui ------------------------------------------
+#
+# Ask GitHub once a day whether a newer jdtui has been released, and say so
+# in the About panel and once in the footer. Default true.
+#
+# This is the only thing jdtui says to anyone but My.JDownloader and the
+# JDownloader itself. It is one unauthenticated GET to
+# api.github.com/repos/rylos/jdtui/releases/latest, the answer is kept in the
+# cache directory so most runs ask nobody, it happens on its own thread and
+# never delays anything, and a failure is silent.
+#
+# Set it to false to never look.
+
+update_check = true
+
+
 # --- Extra addresses for the direct connection -------------------------
 #
 # Addresses to try besides the ones JDownloader reports about itself,

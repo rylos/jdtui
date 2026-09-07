@@ -1,0 +1,8 @@
+# The public half of the key that signs jdtui's commits, tags and release
+# assets. Verify a download against it:
+#
+#   ssh-keygen -Y verify -f allowed_signers -I rylos78@gmail.com -n file \
+#              -s SHA256SUMS.sig < SHA256SUMS
+#
+# Fingerprint: SHA256:A8FoTqTFZrY18WXrAuT1mA2xnmoc4xTDCNIzkQPRjdA
+rylos78@gmail.com namespaces="git,file" ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDB/LAKrcyLl056uukquwhUWXsPj1/ySyylj9uykFneylzNVy8NX6siEkgxYqnFkuq5D5glEEaX0UkODv/gN5pnDRTf8tR6JBpuy2Kp4e6nKLj1d3y0xEu9Ahz8LcY2o0Q+ywiiVPB7EjOZkphvW15qHv8YSiv4luRpTV3IxpGeIxwVEGiaKj0lOiMPiT8vm4xcowdJLwV3LFEDvbMYPeV1GjYELqGbX3od7NVlRDmfqg8QYTZv+bVESq11r4r0XNznAaKAiauV40H/5AXlrn1MYL7iIfLDqhWU8Z6o5EDJyRF89GSBqqvUboSYQrE1PNjtyePt8g/4nBMeGyzUa+rN

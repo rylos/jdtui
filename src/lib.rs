@@ -12,4 +12,5 @@ pub mod myjd;
 pub mod options;
 pub mod poller;
 pub mod ui;
+pub mod update;
 pub mod watch;

@@ -1096,6 +1096,16 @@ fn draw_about(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(Span::styled(format!(" {name}"), Style::new().bold())));
     };
 
+    section(&mut lines, "jdtui");
+    lines.push(Line::from(vec![
+        label("Version"),
+        Span::raw(env!("CARGO_PKG_VERSION")),
+        match &app.new_version {
+            Some(newer) => Span::styled(format!("  ·  {newer} is out"), Style::new().fg(Color::Yellow)),
+            None => Span::styled("  ·  nothing newer released", Style::new().dim()),
+        },
+    ]));
+
     section(&mut lines, "JDownloader");
     lines.push(Line::from(vec![label("Device"), Span::raw(app.device_name.clone())]));
     lines.push(Line::from(vec![
@@ -1508,6 +1518,16 @@ mod tests {
             entry(general, "IfFileExistsAction", "ENUM", json!("SKIP_FILE"), json!("ASK_FOR_EACH_FILE")),
             entry(general, "DefaultDownloadFolder", "STRING", json!("/output"), json!("/config/Downloads")),
         ])
+    }
+
+    #[test]
+    fn about_says_whether_a_newer_jdtui_is_out() {
+        let mut app = App::with_snapshot(sample());
+        app.about = Some(crate::api::About::default());
+        app.mode = crate::app::Mode::About;
+        assert!(shows(&app, "nothing newer released"));
+        app.new_version = Some("99.0.0".into());
+        assert!(shows(&app, "99.0.0 is out"));
     }
 
     #[test]

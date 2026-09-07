@@ -33,6 +33,10 @@ pub struct Config {
     /// Whether the folder above is watched at all (default true). Set it
     /// to false to stop without forgetting the path.
     pub watch: Option<bool>,
+    /// Ask GitHub once a day whether a newer jdtui has been released
+    /// (default true). This is the only thing jdtui says to anyone but
+    /// My.JDownloader and the JDownloader itself.
+    pub update_check: Option<bool>,
     /// Addresses to try besides those JDownloader reports, `host:port`,
     /// for a JDownloader that does not know how it is reached (a Docker
     /// container sees its own address only).
@@ -92,6 +96,10 @@ impl Config {
 
     /// The folder to watch, or `None` when none is set or watching is
     /// switched off.
+    pub fn update_check(&self) -> bool {
+        self.update_check.unwrap_or(true)
+    }
+
     pub fn watch_folder(&self) -> Option<PathBuf> {
         if !self.watch.unwrap_or(true) {
             return None;
