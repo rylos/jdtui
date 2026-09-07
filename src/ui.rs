@@ -276,8 +276,10 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
     // My.JDownloader relay. Shown once the first snapshot is in.
     if !app.snapshot.state.is_empty() {
         match &app.snapshot.direct {
+            // Both marks come from the Arrows block: a cloud is drawn
+            // double-width by many fonts, which left it cut in half.
             Some(_) => state_line.push(Span::styled(" · ⇄ direct", Style::new().fg(Color::Green).dim())),
-            None => state_line.push(Span::styled(" · ☁ relay", Style::new().dim())),
+            None => state_line.push(Span::styled(" · ⇢ relay", Style::new().dim())),
         }
     }
     // What is waiting on someone or something, next to the state.

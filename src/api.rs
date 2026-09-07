@@ -369,6 +369,8 @@ pub struct JdApi {
     device_id: String,
     /// When to look for a direct connection again; `None` right away.
     next_probe: Option<Instant>,
+    /// How long the next fruitless probe will wait before trying again.
+    probe_wait: Duration,
     /// Whether to look for a direct connection at all.
     direct_enabled: bool,
     /// Addresses to try besides those JDownloader reports; they belong to
@@ -378,8 +380,14 @@ pub struct JdApi {
 
 /// How long a direct address gets to answer a ping.
 const PROBE_TIMEOUT: Duration = Duration::from_millis(1000);
-/// How long to stay on the relay after no direct address answered. The
-/// probe blocks the refresh for up to `PROBE_TIMEOUT`, so not too often.
+/// How long to stay on the relay after the first probe that finds nothing.
+/// A direct route usually goes missing for a moment — the JDownloader is
+/// restarting, the wifi hiccuped — and five minutes of relay for a blip
+/// that lasted two seconds is a poor trade.
+const PROBE_FIRST_RETRY: Duration = Duration::from_secs(15);
+/// The ceiling that waiting doubles up to, for a JDownloader that is
+/// genuinely somewhere else. Each probe asks the device for its addresses
+/// and then pings them, so this is not free.
 const PROBE_RETRY: Duration = Duration::from_secs(300);
 /// Reading settings walks JDownloader's whole configuration on the device
 /// side and takes far longer than a list call, especially over the relay.
@@ -397,7 +405,14 @@ fn opt(s: &str) -> Value {
 
 impl JdApi {
     pub fn new(myjd: MyJd, device_id: String) -> Self {
-        Self { myjd, device_id, next_probe: None, direct_enabled: true, direct_extra: Vec::new() }
+        Self {
+            myjd,
+            device_id,
+            next_probe: None,
+            probe_wait: PROBE_FIRST_RETRY,
+            direct_enabled: true,
+            direct_extra: Vec::new(),
+        }
     }
 
     pub fn list_devices(&mut self) -> Result<Vec<crate::myjd::Device>> {
@@ -415,6 +430,7 @@ impl JdApi {
         self.device_id = device_id;
         self.myjd.set_direct(None);
         self.next_probe = None;
+        self.probe_wait = PROBE_FIRST_RETRY;
         // The extra addresses named a machine, not an account: they say
         // nothing about the JDownloader we just moved to.
         self.direct_extra.clear();
@@ -428,6 +444,7 @@ impl JdApi {
         self.direct_extra = extra;
         self.myjd.set_direct(None);
         self.next_probe = None;
+        self.probe_wait = PROBE_FIRST_RETRY;
     }
 
     /// The direct address in use, or none for the relay.
@@ -450,16 +467,28 @@ impl JdApi {
         if self.next_probe.is_some_and(|t| Instant::now() < t) {
             return false;
         }
-        self.next_probe = Some(Instant::now() + PROBE_RETRY);
         // JDownloader takes a second or two over this: it works out its
         // own addresses on every call.
         let mut candidates: Vec<String> = self.direct_connection_infos().unwrap_or_default();
         candidates.extend(self.direct_extra.iter().map(|a| base_url(a)));
+        candidates.sort();
         candidates.dedup();
-        if candidates.is_empty() {
-            return false;
+        let found =
+            !candidates.is_empty() && self.myjd.probe_direct(&self.device_id, &candidates, PROBE_TIMEOUT).is_some();
+        if found {
+            // Nothing to wait for: should this route go missing later, the
+            // next refresh looks again at once. Holding the clock against a
+            // probe that worked is what used to leave a two-second hiccup
+            // costing five minutes of relay.
+            self.next_probe = None;
+            self.probe_wait = PROBE_FIRST_RETRY;
+        } else {
+            self.next_probe = Some(Instant::now() + self.probe_wait);
+            // Back off, so a JDownloader that is really out of reach is not
+            // pinged every fifteen seconds for the rest of the session.
+            self.probe_wait = (self.probe_wait * 2).min(PROBE_RETRY);
         }
-        self.myjd.probe_direct(&self.device_id, &candidates, PROBE_TIMEOUT).is_some()
+        found
     }
 
     /// The addresses JDownloader believes it can be reached at, as base
@@ -1296,5 +1325,32 @@ mod live_direct {
         let state = api.state().expect("state through the fallback");
         println!("state {state} after fallback in {:?}, now via {:?}", t.elapsed(), api.direct().unwrap_or("relay"));
         assert!(api.direct().is_none());
+
+        // And it must come back on the very next look, not five minutes
+        // later: the address that went missing was reachable all along.
+        let t = Instant::now();
+        assert!(api.ensure_direct(), "the direct route did not come back");
+        println!("back on {:?} after {:?}", api.direct(), t.elapsed());
+    }
+
+    /// A JDownloader that cannot be reached directly must not be probed on
+    /// every refresh: the wait doubles from fifteen seconds to five minutes.
+    #[test]
+    #[ignore]
+    fn a_fruitless_probe_backs_off() {
+        let cfg = crate::config::Config::load().expect("config");
+        let mut myjd = MyJd::new(cfg.email.as_deref().unwrap(), cfg.password.as_deref().unwrap());
+        myjd.connect().expect("connect");
+        let mut api = JdApi::new(myjd, cfg.device.clone().expect("device"));
+        // An address that answers nothing, and no others: JDownloader's own
+        // are not asked for, because the device id is not a device.
+        api.device_id = "0".repeat(32);
+        api.set_direct_config(true, vec!["192.0.2.1:3129".into()]);
+        for expected in [PROBE_FIRST_RETRY, PROBE_FIRST_RETRY * 2, PROBE_FIRST_RETRY * 4] {
+            assert!(!api.ensure_direct(), "nothing should answer at 192.0.2.1");
+            assert_eq!(api.probe_wait, expected * 2, "the wait must double after a fruitless probe");
+            // Let the next call through without waiting for the clock.
+            api.next_probe = None;
+        }
     }
 }

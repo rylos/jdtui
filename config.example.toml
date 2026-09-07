@@ -81,9 +81,10 @@ events = true
 # this turns a ~100 ms call into a ~5 ms one.
 #
 # It is safe to leave on wherever you are: if no address answers, or a
-# working one stops answering, jdtui falls back to the relay on the spot
-# and looks again every five minutes. The header shows which is in use,
-# `⇄ direct` or `☁ relay`.
+# working one stops answering, jdtui falls back to the relay on the spot and
+# looks again fifteen seconds later, then doubles the wait up to five
+# minutes for a JDownloader that is really out of reach. The header shows which is in use,
+# `⇄ direct` or `⇢ relay`.
 #
 # Set it to false, or start with `jdtui --no-direct`, to always use the
 # relay.

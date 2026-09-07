@@ -368,8 +368,9 @@ best that answers: IPv6 before IPv4, then the quickest. IPv6 comes first not
 for speed but because an IPv4 address is often behind carrier-grade NAT,
 where the address JDownloader believes it has may not lead back to it. The payload is encrypted the same way either side of
 the relay, so nothing changes on the wire but the host. The header says
-`⇄ direct` or `☁ relay`; a direct route that stops answering falls back to
-the relay on the spot and is looked for again every five minutes. A
+`⇄ direct` or `⇢ relay`; a direct route that stops answering falls back to
+the relay on the spot and is looked for again fifteen seconds later,
+doubling up to five minutes for a JDownloader that is really out of reach. A
 JDownloader in a container only knows its own address, so `direct_addresses`
 in the config adds the ones it cannot see, such as the Docker host; keyed by
 device name when the account has several, since an address belongs to one

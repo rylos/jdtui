@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- A direct connection comes back as soon as it can. jdtui armed its "look
+  again later" clock even when a probe had just succeeded, so the first time
+  a working route went missing — a JDownloader restarting, a moment of wifi
+  — every call went through the relay for the next five minutes. It now
+  looks again on the next refresh, and only a fruitless probe starts a wait,
+  from fifteen seconds doubling to five minutes for a JDownloader that is
+  really out of reach.
+- The relay marker in the header is `⇢` rather than a cloud: many fonts draw
+  the cloud double-width and terminals cut it in half.
+
 - The Status column reads in English throughout. It repeated JDownloader's
   own sentence when there was one, so a JD running in Italian filled the
   column with `Caricamento mirror filestore.me` beside jdtui's own

@@ -52,6 +52,11 @@
 - `.crawljob` keys (Folder Watch `explain.txt`): text, packageName, downloadFolder, extractPasswords, downloadPassword, priority, autoStart, forcedStart, enabled, chunks, comment, filename, autoConfirm, deepAnalyseEnabled, addOfflineLink, overwritePackagizerEnabled, extractAfterDownload. Entries separated by a line containing `->NEW ENTRY<-`, `#` comments, and a JSON array form is also accepted. jdtui maps the subset the API can express (`watch::parse_crawljob`).
 - The FolderWatch extension itself is a JD extension (`InstallExtensionFOLDERWATCH` in `config/list`), watching folders on the JD machine only — not installed on the user's jd2@docker.
 
+## Direct connection (2026-09-07)
+
+- `JdApi::ensure_direct` must NOT arm `next_probe` on a successful probe, only on a fruitless one — doing both meant the first drop of a working route stuck on the relay for the whole retry window. Waits: `PROBE_FIRST_RETRY` 15 s doubling to `PROBE_RETRY` 300 s, reset on success. Covered by `api::live_direct` (both tests are `#[ignore]`, one needs the real device).
+- Header marks: `⇄ direct` / `⇢ relay`, both from the Arrows block. A cloud (U+2601) is drawn double-width by many fonts and gets cut in half.
+
 ## Link and package status (2026-09-07)
 
 - `status` on a link/package is JD's own sentence, in JD's language ("Caricamento mirror filestore.me", "Completato (mirror)", "Download (filestore.me)") and, on failure, a multi-line Java stack trace. NEVER put it in a table column: `model::package_status` / `model::link_status` derive the state from the booleans, and JD's first line is used only when nothing can be derived (an idle row that is idle because it failed).
