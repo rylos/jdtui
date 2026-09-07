@@ -259,10 +259,8 @@ impl MyJd {
     /// interface does with the addresses `getDirectConnectionInfos`
     /// reports. Returns the address chosen, if any.
     pub fn probe_direct(&mut self, device_id: &str, candidates: &[String], timeout: Duration) -> Option<String> {
-        let (session_token, device_key) = match &self.session {
-            Some(s) => (s.session_token.clone(), s.device_key),
-            None => return None,
-        };
+        let session = self.session.as_ref()?;
+        let (session_token, device_key) = (session.session_token.clone(), session.device_key);
         // Every ping needs a request id of its own, handed out here since
         // the threads below cannot touch `self`.
         let requests: Vec<(String, String, i64, String)> = candidates

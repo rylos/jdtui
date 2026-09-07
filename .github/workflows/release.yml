@@ -20,11 +20,21 @@ on:
 permissions:
   contents: write
 
+env:
+  # Pinned so a run cannot start failing because the runners picked up a
+  # newer Rust with new lints, and so the published binaries are built by a
+  # known compiler. Bump it deliberately, with the rest of the toolchain.
+  TOOLCHAIN: "1.93.1"
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Pin the toolchain
+        run: |
+          rustup toolchain install "$TOOLCHAIN" --profile minimal --component clippy,rustfmt
+          rustup default "$TOOLCHAIN"
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       # The live tests are #[ignore]d: they need a My.JDownloader account.
@@ -57,8 +67,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install the target
-        run: rustup target add ${{ matrix.target }}
+      - name: Pin the toolchain and install the target
+        shell: bash
+        run: |
+          rustup toolchain install "$TOOLCHAIN" --profile minimal
+          rustup default "$TOOLCHAIN"
+          rustup target add ${{ matrix.target }}
 
       # `ring`, under rustls, builds C code and needs a musl compiler.
       - name: Install the musl toolchain
