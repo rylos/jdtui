@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.5.0 — 2026-09-07
 
 - `watch_folder` in the config names a folder to watch: `jdtui watch`
   takes it when given none, and the interface watches it in the

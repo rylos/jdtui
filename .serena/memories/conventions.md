@@ -19,3 +19,10 @@
 - Keys: `p` pause/resume, `i` properties with `P` as alias (user asked to swap the old p/P; `i` chosen as the common TUI convention). Footer, HELP const, README table and screenshots must stay in sync.
 - Disabled rows (package or link) fade: row style DarkGray + DIM in `ui::row_base_style`; JD omits false booleans, so a missing `enabled` is disabled.
 - Announced on jlesage/docker-jdownloader-2 discussions #300 (Show and tell), 2026-09-06.
+
+## Wording and shape (2026-09-07)
+
+- One word per concept: the route is "direct"/"relay" everywhere (header `⇄ direct`, About "direct to …", `jdtui status`, config key `direct`). Never introduce a synonym like "straight to".
+- Never show JDownloader's localized `status` text as a state, and never colour by it: derive from booleans and enums. JD's sentence stays only as a fallback for cases jdtui does not model.
+- CLI output is a contract: the `status` JSON shape has a test. Text output stays terse and greppable.
+- Live-testing against the user's JDownloader is fine, but always clean up (remove test packages, empty the folders) in the same turn.

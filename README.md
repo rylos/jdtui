@@ -131,18 +131,19 @@ expiry, and lets you enable, disable or refresh them.
 
 ### The JDownloader itself
 
-`D` opens a menu on the JDownloader you are connected to: check for updates,
-restart, reconnect for a new IP, exit. Installing an update is offered only
+`D` opens a menu on the JDownloader you are connected to: about it, check for
+updates, restart, reconnect for a new IP, exit. Installing an update is offered only
 when JDownloader reports one. Nothing that touches the host machine (shutdown,
 standby) is there.
 
 ![The device menu](docs/device.png)
 
-The first entry describes the JDownloader and the machine under it: version and
-core revision, how long it has been up, whether an update is waiting, whether
-calls reach it directly or through the relay, the operating system and
-architecture, whether it runs in a container, its Java and its heap, and the
-free space of every path it can write to.
+Its first entry, **About**, describes that JDownloader and the machine under
+it: version and core revision, how long it has been up, whether an update is
+waiting, whether calls reach it directly or through the relay, the operating
+system and architecture, whether it runs in a container, its Java and its
+heap, and the free space of every path it can write to. It answers the
+questions worth asking when something looks wrong.
 
 ![What jdtui knows about the JDownloader](docs/about.png)
 
