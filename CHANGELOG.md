@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.0 — 2026-09-07
 
 - Binaries for Linux, macOS and Windows, on Intel and ARM, built by GitHub
   Actions when a tag is pushed. The Linux ones are static musl builds, so
@@ -13,13 +13,11 @@
   says so in the About panel and once in the footer. `update_check = false`
   turns it off; it is the only thing jdtui says to anyone but
   My.JDownloader and the JDownloader itself.
-
 - The Settings panel reads in English throughout. JDownloader translates the
   labels of a list of choices into the language it runs in — and leaves them
   out altogether for some settings — so the panel now uses its own wording,
   which also says what the constants mean: the choice that deletes an archive
   for good is called `NULL`.
-
 - The Settings panel is only as tall as its contents. On a tall terminal it
   filled the screen with the settings at the top and nothing under them,
   which read as if something had failed to load. Its width follows the
