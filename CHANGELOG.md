@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.1 — 2026-09-07
 
 - A direct connection comes back as soon as it can. jdtui armed its "look
   again later" clock even when a probe had just succeeded, so the first time
@@ -11,7 +11,6 @@
   really out of reach.
 - The relay marker in the header is `⇢` rather than a cloud: many fonts draw
   the cloud double-width and terminals cut it in half.
-
 - The Status column reads in English throughout. It repeated JDownloader's
   own sentence when there was one, so a JD running in Italian filled the
   column with `Caricamento mirror filestore.me` beside jdtui's own
