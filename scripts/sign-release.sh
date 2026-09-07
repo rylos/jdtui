@@ -27,11 +27,15 @@ if [ ! -f "$key" ]; then
     exit 1
 fi
 
+# Resolved while we are still inside the checkout: the work below happens in
+# a temporary directory, where gh has no repository to infer from.
+repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 echo "Downloading the assets of $tag…"
-gh release download "$tag" --dir "$work" --pattern '*' --clobber
+gh release download "$tag" --repo "$repo" --dir "$work" --pattern '*' --clobber
 cd "$work"
 
 # Signatures from an earlier run of this script are not what we sign.
@@ -57,7 +61,7 @@ for file in *; do
 done
 
 echo "Uploading the signatures…"
-gh release upload "$tag" ./*.sig --clobber
+gh release upload "$tag" --repo "$repo" ./*.sig --clobber
 
 echo
 echo "Done. Verify one the way anybody else would:"
