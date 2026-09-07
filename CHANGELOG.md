@@ -6,6 +6,9 @@
   `Extracted`, `Extraction failed` — worked out from the extraction queue and
   each link's status instead of JDownloader's localised sentence, which was
   truncated and only readable in JDownloader's language.
+- Finished, downloading and disabled links are told apart by colour —
+  green, cyan, grey — taken from their state, not from the words
+  JDownloader wrote.
 - The Status column has a share of the width of its own, and the header no
   longer cuts off what is waiting.
 - `config.example.toml` documents every config key, and the README links

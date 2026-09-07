@@ -553,23 +553,45 @@ fn status_span(app: &App, packages: &[Package], row: &Row) -> Span<'static> {
     }
     let package = &packages[row.package];
     match row.link {
-        None => Span::styled(package_status(package), Style::new().fg(Color::Yellow)),
+        None => Span::styled(
+            package_status(package),
+            status_style(package.is_finished(), package.is_running(), package.is_enabled(), false),
+        ),
         Some(l) => {
             let link = &package.links[l];
             let text = link.status.clone().unwrap_or_else(|| {
-                if link.is_finished() {
+                if !link.is_enabled() {
+                    "Disabled".into()
+                } else if link.is_finished() {
                     "Finished".into()
                 } else if link.running.unwrap_or(false) {
                     "Downloading".into()
-                } else if !link.is_enabled() {
-                    "Disabled".into()
                 } else {
                     "-".into()
                 }
             });
-            Span::styled(text, Style::new().dim())
+            let running = link.running.unwrap_or(false);
+            Span::styled(text, status_style(link.is_finished(), running, link.is_enabled(), true))
         }
     }
+}
+
+/// Colour by state, never by the words: JDownloader writes those in its
+/// own language, so "Completato" and "Download" would look alike. Green is
+/// done with, cyan is moving, and a disabled row keeps the grey the whole
+/// row is drawn in.
+fn status_style(finished: bool, running: bool, enabled: bool, link: bool) -> Style {
+    let base = if link { Style::new().dim() } else { Style::new() };
+    if !enabled {
+        return base;
+    }
+    if finished {
+        return base.fg(Color::Green);
+    }
+    if running {
+        return base.fg(accent());
+    }
+    if link { base } else { base.fg(Color::Yellow) }
 }
 
 fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static str>, Vec<Constraint>, Vec<TRow<'a>>) {

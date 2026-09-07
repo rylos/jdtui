@@ -185,6 +185,7 @@ fn link(uuid: i64, package: i64, name: &str, loaded: i64, total: i64, done: bool
         host: Some("mirror.example.org".into()),
         url: Some(format!("https://mirror.example.org/{name}")),
         status: Some(if done { "Finished".into() } else { "Downloading".into() }),
+        running: Some(!done),
         ..Default::default()
     }
 }
@@ -245,6 +246,7 @@ fn demo() -> Snapshot {
                 let mut l = link(209, 2, "ubuntu-24.04.1.part1.rev", 0, 768 * 1024 * 1024, false);
                 l.enabled = None;
                 l.status = None;
+                l.running = None;
                 l
             }))
             .collect(),
