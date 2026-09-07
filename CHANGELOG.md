@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- The Settings panel reads in English throughout. JDownloader translates the
+  labels of a list of choices into the language it runs in — and leaves them
+  out altogether for some settings — so the panel now uses its own wording,
+  which also says what the constants mean: the choice that deletes an archive
+  for good is called `NULL`.
+
 - The Settings panel is only as tall as its contents. On a tall terminal it
   filled the screen with the settings at the top and nothing under them,
   which read as if something had failed to load. Its width follows the

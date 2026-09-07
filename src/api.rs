@@ -272,35 +272,14 @@ impl ConfigEntry {
     }
 }
 
-/// One choice of an ENUM setting. JDownloader translates `label` into the
-/// language it runs in, and leaves it out when it has no translation.
+/// One choice of an ENUM setting. `label` is JDownloader's own wording,
+/// translated into the language it runs in and often missing; the Options
+/// panel does not use it, so that it can stay in one language. What matters
+/// here is `name`, the constant the setting is written with.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct EnumOption {
     pub name: String,
     pub label: Option<String>,
-}
-
-impl EnumOption {
-    /// JDownloader's own wording where it has one. Where it has none, the
-    /// constant is made readable rather than shown as
-    /// `ONLY_IF_EXIT_WITH_RUNNING_DOWNLOADS`.
-    pub fn shown(&self) -> String {
-        match &self.label {
-            Some(l) if !l.is_empty() => l.clone(),
-            _ => humanize(&self.name),
-        }
-    }
-}
-
-/// `ONLY_IF_EXIT_WITH_RUNNING_DOWNLOADS` reads as
-/// `Only if exit with running downloads`.
-fn humanize(name: &str) -> String {
-    let words = name.split('_').map(str::to_lowercase).collect::<Vec<_>>().join(" ");
-    let mut chars = words.chars();
-    match chars.next() {
-        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-        None => words,
-    }
 }
 
 /// One notification from the JDownloader event channel.

@@ -140,11 +140,13 @@ once, how many per host, chunks, the speed limit, what happens when a file is
 already there, where packages land, and what the extraction does with archives
 once it has unpacked them.
 
-Everything on the panel comes from the device: the type, the value, the
-default and, for a list of choices, JDownloader's own translated wording. A
-setting the JDownloader does not have simply does not appear, and one that has
-been changed from the default carries a `·`, with the default itself named at
-the foot of the panel. `Enter` changes the setting under the cursor — a
+The type, the value and the default come from the device, so a setting the
+JDownloader does not have simply does not appear, and one that has been
+changed from the default carries a `·`, with the default itself named at the
+foot of the panel. The wording of a list of choices is jdtui's own:
+JDownloader translates its labels into the language it runs in and leaves
+them out for some settings entirely, so taking them would make the panel part
+English and part something else. `Enter` changes the setting under the cursor — a
 toggle flips, a number or a path opens a field, a choice opens a list — and
 `r` puts it back to what JDownloader ships. Every change is written and then
 read back, so what you see is what JDownloader kept, not what was asked for.

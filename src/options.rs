@@ -11,11 +11,9 @@
 //! and the value all come from the device at `/config/list`, so a setting
 //! that a JDownloader does not have simply does not appear.
 
-use std::collections::BTreeMap;
-
 use serde_json::Value;
 
-use crate::api::{ConfigEntry, EnumOption};
+use crate::api::ConfigEntry;
 
 /// How a number is to be read. JDownloader stores plain integers; the unit
 /// is knowledge about the key, not something the API reports.
@@ -28,6 +26,39 @@ pub enum Unit {
     Megabytes,
 }
 
+/// The wording of every choice of one ENUM setting, `constant` to English.
+/// JDownloader translates its own labels into the language it runs in, and
+/// leaves them out for some settings entirely, so a panel that used them
+/// would be part English and part whatever the JDownloader speaks. These
+/// keep it in one language, and say what the constants mean: the choice
+/// that deletes an archive for good is called `NULL`.
+type Choices = &'static [(&'static str, &'static str)];
+
+const IF_FILE_EXISTS: Choices = &[
+    ("OVERWRITE_FILE", "Overwrite the file"),
+    ("SKIP_FILE", "Skip the file"),
+    ("AUTO_RENAME", "Rename the new file"),
+    ("ASK_FOR_EACH_FILE", "Ask every time"),
+];
+
+const START_ON_LAUNCH: Choices = &[
+    ("ALWAYS", "Always"),
+    ("ONLY_IF_EXIT_WITH_RUNNING_DOWNLOADS", "Only if downloads were running at exit"),
+    ("NEVER", "Never"),
+];
+
+const CONFIRM_ADDED: Choices = &[
+    ("AUTO", "Follow JDownloader's quick settings"),
+    ("ENABLED", "Always start them"),
+    ("DISABLED", "Never start them"),
+];
+
+const AFTER_EXTRACTION: Choices = &[
+    ("NO_DELETE", "Keep the archive files"),
+    ("RECYCLE", "Move them to the recycle bin"),
+    ("NULL", "Delete them permanently"),
+];
+
 pub struct Spec {
     pub section: &'static str,
     pub interface: &'static str,
@@ -38,6 +69,8 @@ pub struct Spec {
     /// developers, so the panel prefers this.
     pub note: &'static str,
     pub unit: Unit,
+    /// Empty unless the setting is an ENUM this panel has wording for.
+    pub choices: Choices,
 }
 
 const GENERAL: &str = "org.jdownloader.settings.GeneralSettings";
@@ -49,10 +82,24 @@ pub const INTERFACES: [&str; 3] = [GENERAL, GRABBER, EXTRACTION];
 
 macro_rules! spec {
     ($section:expr, $interface:expr, $key:expr, $label:expr, $note:expr) => {
-        Spec { section: $section, interface: $interface, key: $key, label: $label, note: $note, unit: Unit::None }
+        spec!($section, $interface, $key, $label, $note, Unit::None, &[])
     };
-    ($section:expr, $interface:expr, $key:expr, $label:expr, $note:expr, $unit:expr) => {
-        Spec { section: $section, interface: $interface, key: $key, label: $label, note: $note, unit: $unit }
+    ($section:expr, $interface:expr, $key:expr, $label:expr, $note:expr, unit = $unit:expr) => {
+        spec!($section, $interface, $key, $label, $note, $unit, &[])
+    };
+    ($section:expr, $interface:expr, $key:expr, $label:expr, $note:expr, choices = $choices:expr) => {
+        spec!($section, $interface, $key, $label, $note, Unit::None, $choices)
+    };
+    ($section:expr, $interface:expr, $key:expr, $label:expr, $note:expr, $unit:expr, $choices:expr) => {
+        Spec {
+            section: $section,
+            interface: $interface,
+            key: $key,
+            label: $label,
+            note: $note,
+            unit: $unit,
+            choices: $choices,
+        }
     };
 }
 
@@ -99,7 +146,7 @@ pub const CURATED: &[Spec] = &[
         "DownloadSpeedLimit",
         "Speed limit value",
         "The ceiling on the total download speed.",
-        Unit::Speed
+        unit = Unit::Speed
     ),
     spec!(
         "Downloads",
@@ -114,21 +161,23 @@ pub const CURATED: &[Spec] = &[
         "ForcedFreeSpaceOnDisk",
         "Keep free on disk",
         "Downloads stop rather than fill the disk below this.",
-        Unit::Megabytes
+        unit = Unit::Megabytes
     ),
     spec!(
         "Downloads",
         GENERAL,
         "IfFileExistsAction",
         "If the file exists",
-        "What happens when the file being written is already there."
+        "What happens when the file being written is already there.",
+        choices = IF_FILE_EXISTS
     ),
     spec!(
         "Downloads",
         GENERAL,
         "AutoStartDownloadOption",
         "Start on launch",
-        "Whether JDownloader picks the downloads up again when it starts."
+        "Whether JDownloader picks the downloads up again when it starts.",
+        choices = START_ON_LAUNCH
     ),
     spec!(
         "Downloads",
@@ -149,7 +198,8 @@ pub const CURATED: &[Spec] = &[
         GRABBER,
         "AutoConfirmManagerAutoStart",
         "Confirm added links",
-        "Whether crawled links move to the downloads on their own."
+        "Whether crawled links move to the downloads on their own.",
+        choices = CONFIRM_ADDED
     ),
     spec!(
         "Link Grabber",
@@ -177,7 +227,8 @@ pub const CURATED: &[Spec] = &[
         EXTRACTION,
         "DeleteArchiveFilesAfterExtractionAction",
         "After extraction",
-        "What happens to the archive volumes once they are unpacked."
+        "What happens to the archive volumes once they are unpacked.",
+        choices = AFTER_EXTRACTION
     ),
     spec!(
         "Extraction",
@@ -239,22 +290,21 @@ impl Setting {
         }
     }
 
-    /// The value as the panel shows it, with enum choices translated where
-    /// `enums` has them.
-    pub fn shown(&self, enums: &BTreeMap<String, Vec<EnumOption>>) -> String {
-        self.render(self.entry.value.as_ref(), enums)
+    /// The value as the panel shows it.
+    pub fn shown(&self) -> String {
+        self.render(self.entry.value.as_ref())
     }
 
     /// The value JDownloader ships, shown the same way.
-    pub fn shown_default(&self, enums: &BTreeMap<String, Vec<EnumOption>>) -> String {
-        self.render(self.entry.default_value.as_ref(), enums)
+    pub fn shown_default(&self) -> String {
+        self.render(self.entry.default_value.as_ref())
     }
 
-    fn render(&self, value: Option<&Value>, enums: &BTreeMap<String, Vec<EnumOption>>) -> String {
+    fn render(&self, value: Option<&Value>) -> String {
         let Some(value) = value else { return "-".into() };
         match self.edit() {
             Edit::Toggle => if value.as_bool().unwrap_or(false) { "on" } else { "off" }.into(),
-            Edit::Choice => self.choice_label(value.as_str().unwrap_or_default(), enums),
+            Edit::Choice => self.choice_label(value.as_str().unwrap_or_default()),
             Edit::Number => match value.as_i64() {
                 Some(n) => number(n, self.spec.unit),
                 None => value.to_string(),
@@ -267,16 +317,28 @@ impl Setting {
         }
     }
 
-    /// The translated label of one choice, falling back to the raw name so
-    /// a setting is never shown as blank.
-    pub fn choice_label(&self, name: &str, enums: &BTreeMap<String, Vec<EnumOption>>) -> String {
-        self.entry
-            .kind
-            .as_deref()
-            .and_then(|kind| enums.get(kind))
-            .and_then(|options| options.iter().find(|o| o.name == name))
-            .map(|o| o.shown())
-            .unwrap_or_else(|| EnumOption { name: name.to_string(), label: None }.shown())
+    /// This panel's wording for one choice. A constant it has no wording
+    /// for is made readable rather than shown as
+    /// `ONLY_IF_EXIT_WITH_RUNNING_DOWNLOADS`, so a JDownloader that grows a
+    /// choice still says something.
+    pub fn choice_label(&self, name: &str) -> String {
+        self.spec
+            .choices
+            .iter()
+            .find(|(constant, _)| *constant == name)
+            .map(|(_, wording)| (*wording).to_string())
+            .unwrap_or_else(|| humanize(name))
+    }
+}
+
+/// `ONLY_IF_EXIT_WITH_RUNNING_DOWNLOADS` reads as
+/// `Only if exit with running downloads`.
+fn humanize(name: &str) -> String {
+    let words = name.split('_').map(str::to_lowercase).collect::<Vec<_>>().join(" ");
+    let mut chars = words.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        None => words,
     }
 }
 
@@ -345,11 +407,10 @@ mod tests {
 
     #[test]
     fn values_are_shown_by_type() {
-        let enums = BTreeMap::new();
         let toggle = Setting { spec: &CURATED[1], entry: entry(GENERAL, "k", "BOOLEAN", json!(false)) };
-        assert_eq!(toggle.shown(&enums), "off");
+        assert_eq!(toggle.shown(), "off");
         let text = Setting { spec: &CURATED[10], entry: entry(GENERAL, "k", "STRING", json!("")) };
-        assert_eq!(text.shown(&enums), "not set");
+        assert_eq!(text.shown(), "not set");
     }
 
     #[test]
@@ -360,17 +421,25 @@ mod tests {
     }
 
     #[test]
-    fn an_untranslated_choice_falls_back_to_its_name() {
-        let mut enums = BTreeMap::new();
-        enums.insert(
-            "Action".to_string(),
-            vec![EnumOption { name: "SKIP_FILE".into(), label: Some("Salta file".into()) }],
-        );
+    fn choices_read_in_this_panels_own_words() {
         let mut e = entry(GENERAL, "IfFileExistsAction", "ENUM", json!("SKIP_FILE"));
-        e.kind = Some("Action".into());
+        e.kind = Some("org.jdownloader.settings.IfFileExistsAction".into());
         let setting = Setting { spec: &CURATED[8], entry: e };
-        assert_eq!(setting.shown(&enums), "Salta file");
-        assert_eq!(setting.choice_label("OVERWRITE_FILE", &enums), "Overwrite file");
+        assert_eq!(setting.shown(), "Skip the file");
+        // A constant this panel has no wording for is still readable.
+        assert_eq!(setting.choice_label("SOMETHING_NEW"), "Something new");
+    }
+
+    #[test]
+    fn every_choice_the_device_offers_has_wording() {
+        // The lists were read from a real JDownloader; a constant missing
+        // here would be shown humanized, which reads oddly for `NULL`.
+        assert_eq!(CURATED.iter().filter(|s| !s.choices.is_empty()).count(), 4);
+        for spec in CURATED {
+            for (constant, wording) in spec.choices {
+                assert!(!wording.is_empty(), "{constant} of {} has no wording", spec.key);
+            }
+        }
     }
 }
 
@@ -401,16 +470,22 @@ mod live {
             entries.extend(api.config_list(&format!(".*{interface}.*")).expect("list"));
         }
         let settings = collect(entries);
-        let mut enums: BTreeMap<String, Vec<EnumOption>> = BTreeMap::new();
         for s in &settings {
+            println!("{:<34} {:<10} {}", s.spec.label, format!("{:?}", s.edit()), s.shown());
             if s.edit() == Edit::Choice
                 && let Some(kind) = s.entry.kind.clone()
             {
-                enums.insert(kind.clone(), api.config_enum(&kind).expect("enum"));
+                // Every choice the device offers must have wording here.
+                for choice in api.config_enum(&kind).expect("enum") {
+                    assert!(
+                        s.spec.choices.iter().any(|(constant, _)| *constant == choice.name),
+                        "{} offers {}, which {} has no wording for",
+                        s.spec.key,
+                        choice.name,
+                        s.spec.label
+                    );
+                }
             }
-        }
-        for s in &settings {
-            println!("{:<34} {:<10} {}", s.spec.label, format!("{:?}", s.edit()), s.shown(&enums));
         }
         let missing: Vec<&str> = CURATED
             .iter()

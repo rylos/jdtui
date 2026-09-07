@@ -10,8 +10,7 @@ use std::fmt::Write as _;
 use std::fs;
 
 use jdtui::api::{
-    About, Account, ArchiveStatus, ConfigEntry, EnumOption, Link, Package, RemoveMode, Snapshot, StorageInfo,
-    SystemInfo,
+    About, Account, ArchiveStatus, ConfigEntry, Link, Package, RemoveMode, Snapshot, StorageInfo, SystemInfo,
 };
 use jdtui::app::{App, Mode};
 use jdtui::model::{Action, Form, Tab, build_rows, context_menu};
@@ -562,10 +561,6 @@ fn main() {
             serde_json::Value::Null,
         ),
     ]);
-    let label = |name: &str, shown: &str| EnumOption { name: name.into(), label: Some(shown.into()) };
-    app.option_enums.insert("IfFileExistsAction".into(), vec![label("SKIP_FILE", "Skip the file")]);
-    app.option_enums.insert("Confirm".into(), vec![label("AUTO", "Automatic, by the quick settings")]);
-    app.option_enums.insert("Delete".into(), vec![label("NULL", "Delete no files")]);
     app.option_index = 5;
     app.mode = Mode::Options;
     shot("options", &app);

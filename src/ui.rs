@@ -1273,7 +1273,7 @@ fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
 
     // Widen the panel until the longest value fits, rather than cutting the
     // wording JDownloader chose. The hint under the panel sets the floor.
-    let values: Vec<String> = app.options.iter().map(|s| s.shown(&app.option_enums)).collect();
+    let values: Vec<String> = app.options.iter().map(|s| s.shown()).collect();
     let widest = values.iter().map(|v| v.chars().count()).max().unwrap_or(0);
     let width = ((widest + furniture) as u16).clamp(hint.chars().count() as u16 + 4, room);
     let value_width = (width as usize).saturating_sub(furniture).max(12);
@@ -1345,10 +1345,7 @@ fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
     if let Some(setting) = app.options.get(app.option_index) {
         note.push(Span::styled(setting.spec.note, Style::new().dim()));
         if !setting.is_default() {
-            note.push(Span::styled(
-                format!("  ·  default {}", setting.shown_default(&app.option_enums)),
-                Style::new().dim().italic(),
-            ));
+            note.push(Span::styled(format!("  ·  default {}", setting.shown_default()), Style::new().dim().italic()));
         }
     }
     let note_area = Rect { y: inner.y + list_height as u16, height: note_height, ..inner };
@@ -1365,13 +1362,20 @@ fn draw_option_choice(frame: &mut Frame, app: &App, area: Rect) {
     let block = panel(title, Some("Enter apply · Esc cancel"));
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
+    let setting = app.options.get(app.option_index);
     let lines: Vec<Line> = app
         .option_choices
         .iter()
         .enumerate()
         .map(|(i, choice)| {
             let selected = i == app.option_choice_index;
-            let line = Line::from(format!("  {} {}", if selected { "›" } else { " " }, choice.shown()));
+            // The panel's own wording, not JDownloader's: its labels come
+            // in whatever language it runs in.
+            let wording = match setting {
+                Some(setting) => setting.choice_label(&choice.name),
+                None => choice.name.clone(),
+            };
+            let line = Line::from(format!("  {} {}", if selected { "›" } else { " " }, wording));
             if selected { line.style(selected_style()) } else { line }
         })
         .collect();
@@ -1501,6 +1505,7 @@ mod tests {
             entry(general, "MaxSimultaneDownloads", "INT", json!(5), json!(3)),
             entry(general, "DownloadSpeedLimitEnabled", "BOOLEAN", json!(false), json!(false)),
             entry(general, "DownloadSpeedLimit", "INT", json!(10240), json!(51200)),
+            entry(general, "IfFileExistsAction", "ENUM", json!("SKIP_FILE"), json!("ASK_FOR_EACH_FILE")),
             entry(general, "DefaultDownloadFolder", "STRING", json!("/output"), json!("/config/Downloads")),
         ])
     }
@@ -1566,16 +1571,18 @@ mod tests {
     }
 
     #[test]
-    fn choosing_a_value_shows_jdownloaders_own_wording() {
+    fn choosing_a_value_stays_in_one_language() {
         let mut app = App::with_snapshot(sample());
         app.options = options();
         app.mode = crate::app::Mode::OptionChoice;
+        app.option_index = app.options.iter().position(|s| s.spec.key == "IfFileExistsAction").expect("the setting");
         app.option_choices = vec![
             crate::api::EnumOption { name: "SKIP_FILE".into(), label: Some("Salta file".into()) },
             crate::api::EnumOption { name: "OVERWRITE_FILE".into(), label: None },
         ];
-        assert!(shows(&app, "Salta file"), "a translated choice");
-        assert!(shows(&app, "Overwrite file"), "an untranslated one is made readable");
+        assert!(shows(&app, "Skip the file"), "the panel's own wording");
+        assert!(shows(&app, "Overwrite the file"));
+        assert!(!shows(&app, "Salta file"), "JDownloader's translation is not used");
     }
 
     #[test]
