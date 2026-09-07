@@ -435,6 +435,11 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         draw_folders(frame, app, area);
         return;
     }
+    if app.mode == Mode::About {
+        draw_list(frame, app, list_area);
+        draw_about(frame, app, area);
+        return;
+    }
 
     draw_list(frame, app, list_area);
     if let Some(side) = side_area {
@@ -1037,6 +1042,124 @@ fn draw_folders(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
+/// How long JDownloader has been up, from milliseconds.
+fn human_uptime(ms: i64) -> String {
+    let (d, h, m) = (ms / 86_400_000, (ms / 3_600_000) % 24, (ms / 60_000) % 60);
+    if d > 0 {
+        format!("{d}d {h}h {m}m")
+    } else if h > 0 {
+        format!("{h}h {m}m")
+    } else {
+        format!("{m}m")
+    }
+}
+
+/// The JDownloader and the machine under it. Everything here is read once,
+/// when the panel opens.
+fn draw_about(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(about) = &app.about else { return };
+    let label = |text: &str| Span::styled(format!("  {text:<11}"), Style::new().dim());
+    let mut lines: Vec<Line> = Vec::new();
+    let section = |lines: &mut Vec<Line>, name: &str| {
+        if !lines.is_empty() {
+            lines.push(Line::from(""));
+        }
+        lines.push(Line::from(Span::styled(format!(" {name}"), Style::new().bold())));
+    };
+
+    section(&mut lines, "JDownloader");
+    lines.push(Line::from(vec![label("Device"), Span::raw(app.device_name.clone())]));
+    lines.push(Line::from(vec![
+        label("Version"),
+        Span::raw(format!("{}  ·  core revision {}", about.version, about.core_revision)),
+    ]));
+    lines.push(Line::from(vec![label("Uptime"), Span::raw(human_uptime(about.uptime))]));
+    lines.push(Line::from(vec![
+        label("Updates"),
+        if about.update_available {
+            Span::styled("an update is waiting to be installed", Style::new().fg(Color::Yellow))
+        } else {
+            Span::styled("up to date", Style::new().fg(Color::Green))
+        },
+    ]));
+    lines.push(Line::from(vec![
+        label("Calls go"),
+        match &about.direct {
+            Some(address) => Span::styled(format!("straight to {address}"), Style::new().fg(Color::Green)),
+            None => Span::raw("through the My.JDownloader relay"),
+        },
+    ]));
+
+    let sys = &about.system;
+    section(&mut lines, "Machine");
+    let mut system = sys.os_string.clone().unwrap_or_else(|| "unknown".into());
+    if let Some(name) = &sys.operating_system {
+        system.push_str(&format!("  ·  {name}"));
+    }
+    if let Some(arch) = &sys.arch_string {
+        system.push_str(&format!("  ·  {arch}"));
+    }
+    let mut how = Vec::new();
+    if sys.docker.unwrap_or(false) {
+        how.push("in a container");
+    }
+    if sys.snap.unwrap_or(false) {
+        how.push("from a snap");
+    }
+    if sys.headless.unwrap_or(false) {
+        how.push("headless");
+    }
+    if !how.is_empty() {
+        system.push_str(&format!("  ·  {}", how.join("  ·  ")));
+    }
+    lines.push(Line::from(vec![label("System"), Span::raw(system)]));
+    let java = match (&sys.java_version_string, &sys.java_name) {
+        (Some(v), Some(n)) => format!("{v}  ·  {n}"),
+        (Some(v), None) => v.clone(),
+        _ => "unknown".into(),
+    };
+    lines.push(Line::from(vec![label("Java"), Span::raw(java)]));
+    if let (Some(used), Some(max)) = (sys.heap_used, sys.heap_max) {
+        lines.push(Line::from(vec![
+            label("Memory"),
+            Span::raw(format!("{} of {} available to it", human_size(used), human_size(max))),
+        ]));
+    }
+
+    if !about.storage.is_empty() {
+        section(&mut lines, "Storage");
+        for disk in &about.storage {
+            let path = disk.path.clone().unwrap_or_default();
+            let text = match (disk.free, disk.size) {
+                (Some(free), Some(size)) if size > 0 => {
+                    format!("{} free of {}", human_size(free), human_size(size))
+                }
+                _ => "unknown".into(),
+            };
+            lines.push(Line::from(vec![
+                Span::styled(format!("  {path:<11}"), Style::new().fg(accent())),
+                Span::raw(text),
+            ]));
+        }
+    }
+
+    let height = (lines.len() as u16 + 3).min(area.height);
+    let popup = centered(area, area.width.saturating_sub(8).min(78), height);
+    frame.render_widget(Clear, popup);
+    let block = panel("About", Some("Esc close"));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    // On a short terminal, say what did not fit rather than cutting a
+    // line off mid-sentence.
+    let room = inner.height as usize;
+    if lines.len() > room && room > 0 {
+        let hidden = lines.len() - room + 1;
+        lines.truncate(room.saturating_sub(1));
+        lines.push(Line::from(Span::styled(format!("  … {hidden} more line(s)"), Style::new().dim().italic())));
+    }
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
 fn draw_accounts(frame: &mut Frame, app: &App, area: Rect) {
     let n = app.accounts.len();
     let height = (n as u16 + 5).min(area.height);
@@ -1234,5 +1357,36 @@ mod tests {
         for label in ["Links", "Package name", "Save to", "Priority", "Autostart"] {
             assert!(shows(&app, label), "missing field: {label}");
         }
+    }
+
+    #[test]
+    fn the_about_panel_says_where_the_calls_go() {
+        use crate::api::{About, StorageInfo, SystemInfo};
+        let mut app = App::with_snapshot(sample());
+        app.about = Some(About {
+            version: 48637,
+            core_revision: 50639,
+            uptime: 2 * 86_400_000,
+            system: SystemInfo {
+                docker: Some(true),
+                java_version_string: Some("1.8.0_492-b09".into()),
+                os_string: Some("Linux".into()),
+                ..Default::default()
+            },
+            storage: vec![StorageInfo {
+                path: Some("/downloads".into()),
+                free: Some(1024 * 1024 * 1024),
+                size: Some(4 * 1024 * 1024 * 1024),
+            }],
+            update_available: true,
+            direct: Some("http://192.168.1.30:3129".into()),
+        });
+        app.mode = crate::app::Mode::About;
+        assert!(shows(&app, "core revision 50639"));
+        assert!(shows(&app, "2d 0h 0m"));
+        assert!(shows(&app, "in a container"));
+        assert!(shows(&app, "straight to http://192.168.1.30:3129"));
+        assert!(shows(&app, "an update is waiting"));
+        assert!(shows(&app, "1.00 GB free of 4.00 GB"));
     }
 }

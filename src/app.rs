@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::api::{Account, AddLinks, FolderPolicy, JdApi, LinkVariant, RemoveMode, Snapshot, describe_error};
+use crate::api::{About, Account, AddLinks, FolderPolicy, JdApi, LinkVariant, RemoveMode, Snapshot, describe_error};
 use crate::config::Config;
 use crate::model::{
     Action, Form, MenuEntry, PRIORITIES, Row, RowKey, Tab, build_rows, collect_ids, context_menu, describe,
@@ -64,6 +64,8 @@ pub enum Mode {
     Accounts,
     /// Actions on the JDownloader itself, in `menu`.
     DeviceMenu,
+    /// The JDownloader and the machine under it, in `about`.
+    About,
 }
 
 /// Every key of the main screen, grouped for the help panel. The README's
@@ -113,7 +115,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
             ("s", "Start / stop downloads"),
             ("p", "Pause / resume downloads"),
             ("A", "Accounts: enable, disable, refresh"),
-            ("D", "Captchas, updates, restart, reconnect, exit"),
+            ("D", "About, captchas, updates, restart, reconnect, exit"),
             ("d", "Switch to another JDownloader of the account"),
         ],
     ),
@@ -190,6 +192,8 @@ pub struct App {
     pub urls: Vec<String>,
     /// Accounts shown by `Mode::Accounts`, fetched when the panel opens.
     pub accounts: Vec<Account>,
+    /// What the About panel shows, read when it opens.
+    pub about: Option<About>,
     pub account_index: usize,
     /// Text to put on the system clipboard at the next frame; the binary
     /// sends it as an OSC 52 sequence, the only way out of a remote shell.
@@ -236,6 +240,7 @@ impl App {
             form: None,
             urls: Vec::new(),
             accounts: Vec::new(),
+            about: None,
             account_index: 0,
             clipboard: None,
             message: None,
@@ -284,6 +289,7 @@ impl App {
             form: None,
             urls: Vec::new(),
             accounts: Vec::new(),
+            about: None,
             account_index: 0,
             clipboard: None,
             message: None,
@@ -581,6 +587,7 @@ impl App {
             | Action::NewPackage
             | Action::Urls
             | Action::Variant
+            | Action::About
             | Action::CheckUpdate
             | Action::SkipCaptchas
             | Action::UpdateAndRestart
@@ -601,6 +608,17 @@ impl App {
     }
 
     fn run_device_action(&mut self, action: Action) {
+        // Not a command: it opens a panel and reports nothing.
+        if action == Action::About {
+            match self.with_api(|a| a.about()) {
+                Ok(about) => {
+                    self.about = Some(about);
+                    self.mode = Mode::About;
+                }
+                Err(e) => self.finish(Err(e)),
+            }
+            return;
+        }
         let outcome = match action {
             Action::CheckUpdate => self.with_api(|a| {
                 a.run_update_check()?;
@@ -1016,6 +1034,12 @@ impl App {
                     }
                 }
                 Mode::Accounts => self.handle_accounts_key(key),
+                Mode::About => {
+                    if matches!(key, Key::Esc | Key::Enter | Key::Char('q')) {
+                        self.mode = Mode::List;
+                        self.about = None;
+                    }
+                }
             },
         }
     }

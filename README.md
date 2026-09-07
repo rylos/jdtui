@@ -138,6 +138,14 @@ standby) is there.
 
 ![The device menu](docs/device.png)
 
+The first entry describes the JDownloader and the machine under it: version and
+core revision, how long it has been up, whether an update is waiting, whether
+calls reach it directly or through the relay, the operating system and
+architecture, whether it runs in a container, its Java and its heap, and the
+free space of every path it can write to.
+
+![What jdtui knows about the JDownloader](docs/about.png)
+
 ## Keys
 
 | Key | Action |

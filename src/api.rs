@@ -208,6 +208,41 @@ pub struct StorageInfo {
     pub size: Option<i64>,
 }
 
+/// What the machine running JDownloader says about itself.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemInfo {
+    pub arch_string: Option<String>,
+    pub docker: Option<bool>,
+    pub headless: Option<bool>,
+    pub heap_committed: Option<i64>,
+    pub heap_max: Option<i64>,
+    pub heap_used: Option<i64>,
+    pub java_name: Option<String>,
+    pub java_vendor: Option<String>,
+    pub java_version_string: Option<String>,
+    pub operating_system: Option<String>,
+    pub os_family: Option<String>,
+    pub os_string: Option<String>,
+    pub snap: Option<bool>,
+    /// Milliseconds since the epoch.
+    pub startup_time_stamp: Option<i64>,
+}
+
+/// Everything the About panel shows, gathered in one round.
+#[derive(Debug, Clone, Default)]
+pub struct About {
+    pub version: i64,
+    pub core_revision: i64,
+    /// Milliseconds JDownloader has been up.
+    pub uptime: i64,
+    pub system: SystemInfo,
+    pub storage: Vec<StorageInfo>,
+    pub update_available: bool,
+    /// The address device calls go to, or `None` through the relay.
+    pub direct: Option<String>,
+}
+
 /// One notification from the JDownloader event channel.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Event {
@@ -803,6 +838,21 @@ impl JdApi {
     }
 
     /// The mount points JDownloader sees, with their free space.
+    /// The JDownloader and the machine under it, for the About panel.
+    /// Six round trips, so it is fetched when the panel opens and not on
+    /// every refresh. The two that some setups refuse are tolerated.
+    pub fn about(&mut self) -> Result<About> {
+        Ok(About {
+            version: self.call("/jd/version", &[])?,
+            core_revision: self.call("/jd/getCoreRevision", &[])?,
+            uptime: self.call("/jd/uptime", &[])?,
+            system: self.call("/system/getSystemInfos", &[])?,
+            storage: self.storage_roots().unwrap_or_default(),
+            update_available: self.update_available().unwrap_or(false),
+            direct: self.myjd.direct().map(str::to_string),
+        })
+    }
+
     pub fn storage_roots(&mut self) -> Result<Vec<StorageInfo>> {
         self.call("/system/getStorageInfos", &[Value::Null])
     }

@@ -9,7 +9,7 @@
 use std::fmt::Write as _;
 use std::fs;
 
-use jdtui::api::{Account, ArchiveStatus, Link, Package, RemoveMode, Snapshot};
+use jdtui::api::{About, Account, ArchiveStatus, Link, Package, RemoveMode, Snapshot, StorageInfo, SystemInfo};
 use jdtui::app::{App, Mode};
 use jdtui::model::{Action, Form, Tab, build_rows, context_menu};
 use jdtui::ui;
@@ -475,6 +475,34 @@ fn main() {
     app.menu_index = 1;
     app.mode = Mode::DeviceMenu;
     shot("device", &app);
+
+    // The JDownloader and the machine under it.
+    let mut app = base();
+    app.about = Some(About {
+        version: 48637,
+        core_revision: 50639,
+        uptime: 2 * 86_400_000 + 8 * 3_600_000 + 39 * 60_000,
+        system: SystemInfo {
+            arch_string: Some("amd64".into()),
+            docker: Some(true),
+            headless: Some(true),
+            heap_used: Some(497_861_904),
+            heap_max: Some(28_631_367_680),
+            java_name: Some("OpenJDK 64-Bit Server VM".into()),
+            java_version_string: Some("1.8.0_492-b09".into()),
+            operating_system: Some("ALPINE".into()),
+            os_string: Some("Linux".into()),
+            ..Default::default()
+        },
+        storage: vec![
+            StorageInfo { path: Some("/".into()), free: Some(303_740_014_592), size: Some(539_981_832_192) },
+            StorageInfo { path: Some("/downloads".into()), free: Some(272_180_891_648), size: Some(539_978_293_248) },
+        ],
+        update_available: false,
+        direct: Some("http://192.168.1.30:3129".into()),
+    });
+    app.mode = Mode::About;
+    shot("about", &app);
 
     // The key reference.
     let mut app = base();

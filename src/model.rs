@@ -263,6 +263,7 @@ pub enum Action {
     /// Open the variant chooser; one grabber link with variants.
     Variant,
     // The JDownloader itself, from the device menu; no selection involved.
+    About,
     CheckUpdate,
     /// Give up on every captcha waiting; the blocked links are skipped.
     SkipCaptchas,
@@ -278,7 +279,8 @@ impl Action {
     pub fn is_device(self) -> bool {
         matches!(
             self,
-            Action::CheckUpdate
+            Action::About
+                | Action::CheckUpdate
                 | Action::SkipCaptchas
                 | Action::UpdateAndRestart
                 | Action::RestartJd
@@ -374,6 +376,7 @@ pub fn device_menu(update_available: bool, captchas: usize) -> Vec<MenuEntry> {
         let label = format!("Skip {captchas} waiting captcha{}", if captchas == 1 { "" } else { "s" });
         v.push(entry(label, Action::SkipCaptchas, true));
     }
+    v.push(entry("About this JDownloader", Action::About, false));
     v.push(entry("Check for updates", Action::CheckUpdate, false));
     if update_available {
         v.push(entry("Update and restart", Action::UpdateAndRestart, true));

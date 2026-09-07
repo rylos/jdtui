@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- The device menu (`D`) opens an About panel: version and core revision,
+  uptime, pending update, whether calls go direct or through the relay,
+  the operating system, whether JDownloader runs in a container, its Java
+  and heap, and the free space of every path it can write to.
+
 ## 1.4.0 — 2026-09-07
 
 - Extraction is shown in jdtui's own words — `Extracting`, `Extract queued`,
