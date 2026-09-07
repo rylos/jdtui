@@ -99,21 +99,6 @@ fn progress_bar(pct: f64, width: usize) -> Span<'static> {
     Span::styled(bar, Style::new().fg(color))
 }
 
-fn package_status(p: &Package) -> String {
-    if let Some(s) = &p.status {
-        return s.clone();
-    }
-    if p.is_finished() {
-        "Finished".into()
-    } else if p.is_running() {
-        "Downloading".into()
-    } else if !p.is_enabled() {
-        "Disabled".into()
-    } else {
-        "Queued".into()
-    }
-}
-
 // --- entry point ------------------------------------------------------------
 
 pub fn draw(frame: &mut Frame, app: &App) {
@@ -586,22 +571,12 @@ fn status_span(packages: &[Package], row: &Row, extraction: Option<Extraction>) 
     let package = &packages[row.package];
     match row.link {
         None => Span::styled(
-            package_status(package),
+            crate::model::package_status(package),
             status_style(package.is_finished(), package.is_running(), package.is_enabled(), false),
         ),
         Some(l) => {
             let link = &package.links[l];
-            let text = link.status.clone().unwrap_or_else(|| {
-                if !link.is_enabled() {
-                    "Disabled".into()
-                } else if link.is_finished() {
-                    "Finished".into()
-                } else if link.running.unwrap_or(false) {
-                    "Downloading".into()
-                } else {
-                    "-".into()
-                }
-            });
+            let text = crate::model::link_status(link, package);
             let running = link.running.unwrap_or(false);
             Span::styled(text, status_style(link.is_finished(), running, link.is_enabled(), true))
         }
@@ -920,7 +895,10 @@ fn draw_properties(frame: &mut Frame, app: &App, area: Rect) {
             push("Name", Some(pkg.name.clone()));
             push("UUID", Some(pkg.uuid.to_string()));
             push("Type", Some("Package".into()));
-            push("Status", pkg.status.clone());
+            push("Status", Some(crate::model::package_status(pkg)));
+            // The sentence JDownloader wrote, in its own language and at
+            // whatever length: this is the one place with room for it.
+            push("JDownloader", pkg.status.clone());
             push("Size", pkg.bytes_total.map(human_size));
             push("Loaded", pkg.bytes_loaded.map(human_size));
             push("Links", pkg.child_count.map(|n| n.to_string()));
@@ -941,7 +919,8 @@ fn draw_properties(frame: &mut Frame, app: &App, area: Rect) {
             push("Name", Some(link.name.clone()));
             push("UUID", Some(link.uuid.to_string()));
             push("Type", Some("Link".into()));
-            push("Status", link.status.clone());
+            push("Status", Some(crate::model::link_status(link, pkg)));
+            push("JDownloader", link.status.clone());
             push("Extraction", link.extraction_status.clone());
             push("Size", link.bytes_total.map(human_size));
             push("Loaded", link.bytes_loaded.map(human_size));
@@ -1494,7 +1473,9 @@ mod tests {
         let app = App::with_snapshot(sample());
         assert!(shows(&app, "jdtui · jd2@test"));
         assert!(shows(&app, "Show S01"));
-        assert!(shows(&app, "Extraction OK"));
+        // The state jdtui derived, not the sentence JDownloader wrote.
+        assert!(shows(&app, "Finished"));
+        assert!(!shows(&app, "Extraction OK"));
         assert!(shows(&app, "Downloads (1)"));
     }
 

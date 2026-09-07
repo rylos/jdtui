@@ -51,3 +51,10 @@
 - `linkgrabberv2/addContainer(type, content)`: `content` MUST be a base64 **data URL** — JD does `getInputStreamFromBase64DataURL`, which looks for `;base64,` and decodes what follows (source: `LinkCollectorAPIImplV2.loadContainer`). `type` is used as the file extension of the temp file, so pass the container's own extension (`dlc`, `ccf`, `rsdf`). jdtui sends `data:application/octet-stream;base64,<b64>` (`JdApi::add_container`).
 - `.crawljob` keys (Folder Watch `explain.txt`): text, packageName, downloadFolder, extractPasswords, downloadPassword, priority, autoStart, forcedStart, enabled, chunks, comment, filename, autoConfirm, deepAnalyseEnabled, addOfflineLink, overwritePackagizerEnabled, extractAfterDownload. Entries separated by a line containing `->NEW ENTRY<-`, `#` comments, and a JSON array form is also accepted. jdtui maps the subset the API can express (`watch::parse_crawljob`).
 - The FolderWatch extension itself is a JD extension (`InstallExtensionFOLDERWATCH` in `config/list`), watching folders on the JD machine only — not installed on the user's jd2@docker.
+
+## Link and package status (2026-09-07)
+
+- `status` on a link/package is JD's own sentence, in JD's language ("Caricamento mirror filestore.me", "Completato (mirror)", "Download (filestore.me)") and, on failure, a multi-line Java stack trace. NEVER put it in a table column: `model::package_status` / `model::link_status` derive the state from the booleans, and JD's first line is used only when nothing can be derived (an idle row that is idle because it failed).
+- `statusIconKey` does NOT identify an error: a failed link reports `kc.<md5>` (the hoster's icon), exactly like a healthy one. Values seen: `true` (finished), `true-orange` (finished as the mirror twin), `kc.<md5>` (hoster icon, any state), absent.
+- Mirrors: JD keeps one link per hoster for the same file. The twin that is not carrying the download is enabled, not running, not finished, 0 bytes loaded, and its sentence says "loading mirror" — i.e. it is simply waiting.
+- `queryLinks` accepts `skipped`, which is a real state and is now requested.

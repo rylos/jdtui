@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- The Status column reads in English throughout. It repeated JDownloader's
+  own sentence when there was one, so a JD running in Italian filled the
+  column with `Caricamento mirror filestore.me` beside jdtui's own
+  `Disabled`, and a failed link filled it with the beginning of a Java stack
+  trace. Every state is now derived — `Downloading`, `Waiting`, `Finished`,
+  `Disabled`, `Skipped` — and JDownloader's words are kept for the one case
+  nothing can be derived from, an idle row that is idle because something
+  went wrong. The Properties panel shows both, its sentence in full.
+
 ## 1.8.0 — 2026-09-07
 
 - Binaries for Linux, macOS and Windows, on Intel and ARM, built by GitHub

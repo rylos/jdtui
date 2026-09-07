@@ -65,7 +65,12 @@ pub struct Link {
     /// The variant currently chosen, when the link has any.
     pub variant: Option<LinkVariant>,
     pub running: Option<bool>,
+    /// The user told JDownloader to leave this link alone for now.
+    pub skipped: Option<bool>,
     pub speed: Option<i64>,
+    /// The sentence JDownloader wrote about this link, in the language it
+    /// runs in — and, when something failed, a Java stack trace. Never a
+    /// state: see `model::link_status`.
     pub status: Option<String>,
     pub url: Option<String>,
 }
@@ -544,8 +549,8 @@ impl JdApi {
                 "addedDate": true, "bytesLoaded": true, "bytesTotal": true,
                 "comment": true, "enabled": true, "eta": true, "extractionStatus": true,
                 "finished": true, "finishedDate": true, "host": true, "packageUUIDs": [],
-                "priority": true, "running": true, "speed": true, "status": true,
-                "url": true, "maxResults": -1, "startAt": 0,
+                "priority": true, "running": true, "skipped": true, "speed": true,
+                "status": true, "url": true, "maxResults": -1, "startAt": 0,
             })],
         )?;
         Ok(attach(packages, links))
