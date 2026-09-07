@@ -864,6 +864,7 @@
 <text x="1055.6" y="187.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1064.0" y="187.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1072.4" y="187.5" fill="#c8ccd4" opacity="0.65">%</text>
+<text x="1198.4" y="187.5" fill="#c8ccd4" opacity="0.65">-</text>
 <text x="1265.6" y="187.5" fill="#5c6370">│</text>
 <text x="14.0" y="205.5" fill="#5c6370">│</text>
 <text x="56.0" y="205.5" fill="#c8ccd4" opacity="0.65">└</text>
@@ -920,6 +921,7 @@
 <text x="1055.6" y="205.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1064.0" y="205.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1072.4" y="205.5" fill="#c8ccd4" opacity="0.65">%</text>
+<text x="1198.4" y="205.5" fill="#c8ccd4" opacity="0.65">-</text>
 <text x="1265.6" y="205.5" fill="#5c6370">│</text>
 <text x="14.0" y="223.5" fill="#5c6370">│</text>
 <text x="56.0" y="223.5" fill="#c8ccd4" opacity="0.65">└</text>
@@ -976,6 +978,7 @@
 <text x="1055.6" y="223.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1064.0" y="223.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1072.4" y="223.5" fill="#c8ccd4" opacity="0.65">%</text>
+<text x="1198.4" y="223.5" fill="#c8ccd4" opacity="0.65">-</text>
 <text x="1265.6" y="223.5" fill="#5c6370">│</text>
 <text x="14.0" y="241.5" fill="#5c6370">│</text>
 <text x="56.0" y="241.5" fill="#c8ccd4" opacity="0.65">└</text>
@@ -1032,6 +1035,7 @@
 <text x="1055.6" y="241.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1064.0" y="241.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1072.4" y="241.5" fill="#c8ccd4" opacity="0.65">%</text>
+<text x="1198.4" y="241.5" fill="#c8ccd4" opacity="0.65">-</text>
 <text x="1265.6" y="241.5" fill="#5c6370">│</text>
 <text x="14.0" y="259.5" fill="#5c6370">│</text>
 <text x="56.0" y="259.5" fill="#c8ccd4" opacity="0.65">└</text>
@@ -1083,6 +1087,11 @@
 <text x="719.6" y="259.5" fill="#56b6c2" opacity="0.65">g</text>
 <text x="1047.2" y="259.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1055.6" y="259.5" fill="#c8ccd4" opacity="0.65">%</text>
+<text x="1198.4" y="259.5" fill="#c8ccd4" opacity="0.65">4</text>
+<text x="1206.8" y="259.5" fill="#c8ccd4" opacity="0.65">m</text>
+<text x="1223.6" y="259.5" fill="#c8ccd4" opacity="0.65">4</text>
+<text x="1232.0" y="259.5" fill="#c8ccd4" opacity="0.65">7</text>
+<text x="1240.4" y="259.5" fill="#c8ccd4" opacity="0.65">s</text>
 <text x="1265.6" y="259.5" fill="#5c6370">│</text>
 <text x="14.0" y="277.5" fill="#5c6370">│</text>
 <text x="56.0" y="277.5" fill="#c8ccd4" opacity="0.65">└</text>
@@ -1134,6 +1143,11 @@
 <text x="719.6" y="277.5" fill="#56b6c2" opacity="0.65">g</text>
 <text x="1047.2" y="277.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1055.6" y="277.5" fill="#c8ccd4" opacity="0.65">%</text>
+<text x="1198.4" y="277.5" fill="#c8ccd4" opacity="0.65">4</text>
+<text x="1206.8" y="277.5" fill="#c8ccd4" opacity="0.65">m</text>
+<text x="1223.6" y="277.5" fill="#c8ccd4" opacity="0.65">4</text>
+<text x="1232.0" y="277.5" fill="#c8ccd4" opacity="0.65">7</text>
+<text x="1240.4" y="277.5" fill="#c8ccd4" opacity="0.65">s</text>
 <text x="1265.6" y="277.5" fill="#5c6370">│</text>
 <text x="14.0" y="295.5" fill="#5c6370">│</text>
 <text x="56.0" y="295.5" fill="#c8ccd4" opacity="0.65">└</text>
@@ -1185,6 +1199,11 @@
 <text x="719.6" y="295.5" fill="#56b6c2" opacity="0.65">g</text>
 <text x="1047.2" y="295.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1055.6" y="295.5" fill="#c8ccd4" opacity="0.65">%</text>
+<text x="1198.4" y="295.5" fill="#c8ccd4" opacity="0.65">4</text>
+<text x="1206.8" y="295.5" fill="#c8ccd4" opacity="0.65">m</text>
+<text x="1223.6" y="295.5" fill="#c8ccd4" opacity="0.65">4</text>
+<text x="1232.0" y="295.5" fill="#c8ccd4" opacity="0.65">7</text>
+<text x="1240.4" y="295.5" fill="#c8ccd4" opacity="0.65">s</text>
 <text x="1265.6" y="295.5" fill="#5c6370">│</text>
 <text x="14.0" y="313.5" fill="#5c6370">│</text>
 <text x="56.0" y="313.5" fill="#c8ccd4" opacity="0.65">└</text>
@@ -1241,6 +1260,11 @@
 <text x="719.6" y="313.5" fill="#56b6c2" opacity="0.65">g</text>
 <text x="1047.2" y="313.5" fill="#c8ccd4" opacity="0.65">0</text>
 <text x="1055.6" y="313.5" fill="#c8ccd4" opacity="0.65">%</text>
+<text x="1198.4" y="313.5" fill="#c8ccd4" opacity="0.65">4</text>
+<text x="1206.8" y="313.5" fill="#c8ccd4" opacity="0.65">m</text>
+<text x="1223.6" y="313.5" fill="#c8ccd4" opacity="0.65">4</text>
+<text x="1232.0" y="313.5" fill="#c8ccd4" opacity="0.65">7</text>
+<text x="1240.4" y="313.5" fill="#c8ccd4" opacity="0.65">s</text>
 <text x="1265.6" y="313.5" fill="#5c6370">│</text>
 <text x="14.0" y="331.5" fill="#5c6370">│</text>
 <text x="56.0" y="331.5" fill="#5c6370" opacity="0.65">└</text>
@@ -1289,6 +1313,7 @@
 <text x="694.4" y="331.5" fill="#5c6370" opacity="0.65">d</text>
 <text x="1047.2" y="331.5" fill="#5c6370" opacity="0.65">0</text>
 <text x="1055.6" y="331.5" fill="#5c6370" opacity="0.65">%</text>
+<text x="1198.4" y="331.5" fill="#5c6370" opacity="0.65">-</text>
 <text x="1265.6" y="331.5" fill="#5c6370">│</text>
 <text x="14.0" y="349.5" fill="#5c6370">│</text>
 <text x="30.8" y="349.5" fill="#c8ccd4">▶</text>
@@ -1361,7 +1386,9 @@
 <text x="1064.0" y="349.5" fill="#c8ccd4">0</text>
 <text x="1072.4" y="349.5" fill="#c8ccd4">%</text>
 <text x="1097.6" y="349.5" fill="#56b6c2">-</text>
-<text x="1198.4" y="349.5" fill="#98c379">-</text>
+<text x="1198.4" y="349.5" fill="#98c379">4</text>
+<text x="1206.8" y="349.5" fill="#98c379">1</text>
+<text x="1215.2" y="349.5" fill="#98c379">s</text>
 <text x="1265.6" y="349.5" fill="#5c6370">│</text>
 <text x="14.0" y="367.5" fill="#5c6370">│</text>
 <text x="30.8" y="367.5" fill="#c8ccd4">▶</text>

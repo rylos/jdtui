@@ -35,3 +35,10 @@
 - `extraction/getArchiveInfo(linkIds, packageIds)` and `extraction/getQueue` return the same `ArchiveStatus`: `archiveId`, `archiveName` (base name, no `.partNN.rar`), `controllerId`, `controllerStatus` (`RUNNING`/`QUEUED` in the queue, `NA` otherwise), `type` (RAR_MULTI…), and **`states`: a map member-filename → COMPLETE/INCOMPLETE/MISSING**. Those keys are link names, which is how jdtui matches a queued archive to its package (`model::extraction_of`).
 - Per-link `extractionStatus` is language-independent: `SUCCESSFUL`, `ERROR*`, `IDLE`, or absent. It is the outcome of a finished run, so a package still downloading must not be called "Extracted" (jdtui gates that on `package.is_finished()`).
 - Still no extraction percentage anywhere in the structured API; the ETA exists only inside JD's localized sentence.
+
+## Extraction ETA (measured live 2026-09-07, whole run observed)
+
+- There is **no extraction progress/percentage anywhere**: a full `queryLinks`/`queryPackages` dump during a live extraction shows only `eta` moving; `bytesLoaded/bytesTotal` stay at the download figures and the queue payload is byte-identical across polls (keys: archiveId, archiveName, controllerId, controllerStatus, states, type).
+- **The ETA lives on the links, not the package**: during extraction `package.eta` is absent while each archive link carries `eta` and `status` = the localized "extracting" word. jdtui takes the longest link eta for the package row (`ui::package_eta`).
+- **Units differ by state**: download eta is in SECONDS, extraction eta is in MILLISECONDS. Verified twice — the figure fell ~1000-1350 per wall-clock second, and 425811 ms seen at ~10:16:30 predicted the end at 10:23:36 against an actual 10:23:41. `ui::eta_seconds(raw, extracting)` divides by 1000 only while extracting.
+- Full lifecycle confirmed on a real 67 GB / 33-volume RAR: queue entry with `controllerStatus: RUNNING` → jdtui "Extracting" (JD meanwhile said only "Completato", i.e. the download); after the run the links flip to `SUCCESSFUL` → jdtui "Extracted".

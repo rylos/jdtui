@@ -186,6 +186,8 @@ fn link(uuid: i64, package: i64, name: &str, loaded: i64, total: i64, done: bool
         url: Some(format!("https://mirror.example.org/{name}")),
         status: Some(if done { "Finished".into() } else { "Downloading".into() }),
         running: Some(!done),
+        // Seconds while a link is downloading.
+        eta: (!done).then_some(287),
         ..Default::default()
     }
 }
@@ -247,6 +249,7 @@ fn demo() -> Snapshot {
                 l.enabled = None;
                 l.status = None;
                 l.running = None;
+                l.eta = None;
                 l
             }))
             .collect(),
@@ -290,6 +293,10 @@ fn demo() -> Snapshot {
                 );
                 l.status = None;
                 l.extraction_status = None;
+                // Milliseconds while the archive is being unpacked, which
+                // is where JDownloader puts the wait instead of on the
+                // package.
+                l.eta = Some(41_000);
                 l
             })
             .collect(),

@@ -46,6 +46,12 @@ and they rarely fit the column; jdtui works the state out from the extraction
 queue and from what each link reports, which read the same everywhere. Its own
 text is still shown for anything jdtui does not model, and in full under `i`.
 
+While an archive is being unpacked the **ETA** column counts that down too:
+JDownloader stops reporting a wait for the package then and puts one on each
+of its links instead, so jdtui takes the longest of those. There is no
+percentage to be had — the API reports no extraction progress at all, only
+the time left.
+
 The colour of that column follows the state rather than the words, for the
 same reason: green for what is done with, cyan for what is moving, grey for
 what is switched off. A finished link and a downloading one no longer look

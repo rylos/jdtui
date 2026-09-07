@@ -6,6 +6,10 @@
   `Extracted`, `Extraction failed` — worked out from the extraction queue and
   each link's status instead of JDownloader's localised sentence, which was
   truncated and only readable in JDownloader's language.
+- The ETA of an extraction is shown: JDownloader reports it on the links
+  rather than on the package, and in milliseconds rather than seconds, so
+  neither the package row nor the link rows used to show anything.
+- Link rows show their own ETA while downloading, which they never did.
 - Finished, downloading and disabled links are told apart by colour —
   green, cyan, grey — taken from their state, not from the words
   JDownloader wrote.

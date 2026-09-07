@@ -541,8 +541,8 @@ fn stop_mark(app: &App, packages: &[Package], row: &Row) -> Span<'static> {
 /// The Status cell of a row. An archive jdtui can name itself wins over
 /// JDownloader's own sentence, which is written in its language and is
 /// usually too long for the column.
-fn status_span(app: &App, packages: &[Package], row: &Row) -> Span<'static> {
-    if let Some(state) = extraction_of(packages, row, &app.snapshot.extracting) {
+fn status_span(packages: &[Package], row: &Row, extraction: Option<Extraction>) -> Span<'static> {
+    if let Some(state) = extraction {
         let style = match state {
             Extraction::Running => Style::new().fg(Color::Yellow).bold(),
             Extraction::Queued => Style::new().fg(Color::Yellow).dim(),
@@ -574,6 +574,25 @@ fn status_span(app: &App, packages: &[Package], row: &Row) -> Span<'static> {
             Span::styled(text, status_style(link.is_finished(), running, link.is_enabled(), true))
         }
     }
+}
+
+/// How long the row still has to wait, in seconds.
+///
+/// JDownloader counts that wait in seconds while a link is downloading,
+/// but in milliseconds while its archive is being unpacked, and it stops
+/// reporting the package's own wait then, putting one on each of its
+/// links instead. Both were measured against the clock on a live
+/// extraction: the figure fell by about a thousand a second.
+fn eta_seconds(raw: i64, extracting: bool) -> i64 {
+    if extracting { raw / 1000 } else { raw }
+}
+
+fn package_eta(package: &Package, extraction: Option<Extraction>) -> i64 {
+    if extraction == Some(Extraction::Running) {
+        let longest = package.links.iter().filter_map(|l| l.eta).max().unwrap_or(0);
+        return eta_seconds(longest, true);
+    }
+    package.eta.unwrap_or(0)
 }
 
 /// Colour by state, never by the words: JDownloader writes those in its
@@ -614,6 +633,7 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
         .map(|row| {
             let pkg = &packages[row.package];
             let style = row_base_style(app, packages, row);
+            let extraction = extraction_of(packages, row, &app.snapshot.extracting);
             match row.link {
                 None => {
                     let marker = if app.expanded.contains(&pkg.uuid) { "▼" } else { "▶" };
@@ -632,7 +652,7 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
                             ),
                             Style::new().dim(),
                         )),
-                        Cell::from(status_span(app, packages, row)),
+                        Cell::from(status_span(packages, row, extraction)),
                         Cell::from(progress_bar(pct, 18)),
                         Cell::from(format!("{pct:.0}%")),
                         Cell::from(Span::styled(
@@ -642,7 +662,10 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
                                 .unwrap_or_else(|| "-".into()),
                             Style::new().fg(accent()),
                         )),
-                        Cell::from(Span::styled(human_eta(pkg.eta.unwrap_or(0)), Style::new().fg(Color::Green))),
+                        Cell::from(Span::styled(
+                            human_eta(package_eta(pkg, extraction)),
+                            Style::new().fg(Color::Green),
+                        )),
                     ])
                     .style(style)
                 }
@@ -663,13 +686,16 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
                             ),
                             Style::new().dim(),
                         )),
-                        Cell::from(status_span(app, packages, row)),
+                        Cell::from(status_span(packages, row, extraction)),
                         Cell::from(""),
                         Cell::from(Span::styled(format!("{pct:.0}%"), Style::new().dim())),
                         Cell::from(
                             link.speed.filter(|s| *s > 0).map(|s| format!("{}/s", human_size(s))).unwrap_or_default(),
                         ),
-                        Cell::from(""),
+                        Cell::from(Span::styled(
+                            human_eta(eta_seconds(link.eta.unwrap_or(0), extraction == Some(Extraction::Running))),
+                            Style::new().dim(),
+                        )),
                     ])
                     .style(style)
                 }
