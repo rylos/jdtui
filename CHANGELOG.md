@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.3 — 2026-09-08
 
 - The About panel says when it last looked for a newer jdtui. The answer can
   be up to a day old — the check asks GitHub once a day and reads a cache in
