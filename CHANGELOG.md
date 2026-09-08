@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.2 — 2026-09-08
 
 - A package waiting its turn says so. JDownloader writes "an error
   occurred!" while a hoster makes it wait, and the package then starts
