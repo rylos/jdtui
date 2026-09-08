@@ -44,8 +44,8 @@ pub enum Update {
     Events(bool),
     /// Files found in the watched folder and handed to JDownloader.
     Watched(Vec<watch::Outcome>),
-    /// A newer jdtui has been released; the string is its version.
-    NewVersion(String),
+    /// The look for a newer jdtui finished, whether it found one or not.
+    Checked(crate::update::Check),
 }
 
 /// Credentials for the listener's own session.
@@ -88,8 +88,8 @@ impl Poller {
         if update_check {
             let tx = tx.clone();
             thread::spawn(move || {
-                if let Some(version) = crate::update::newer_than(env!("CARGO_PKG_VERSION")) {
-                    let _ = tx.send(Update::NewVersion(version));
+                if let Some(check) = crate::update::look(env!("CARGO_PKG_VERSION")) {
+                    let _ = tx.send(Update::Checked(check));
                 }
             });
         }
@@ -298,7 +298,7 @@ mod live {
                     Update::Error(e) => println!("  [update] error: {e}"),
                     Update::Events(live) => println!("  [update] events live: {live}"),
                     Update::Watched(o) => println!("  [update] watched folder: {} file(s)", o.len()),
-                    Update::NewVersion(v) => println!("  [update] jdtui {v} is out"),
+                    Update::Checked(c) => println!("  [update] looked for a newer jdtui: {:?}", c.newer),
                 }
                 if let Some(v) = f(u) {
                     return v;

@@ -51,7 +51,9 @@ and tags are signed with the same key.
 ### A new version
 
 jdtui asks GitHub once a day whether a newer one has been released, and says
-so in the About panel (`D`, then About) and once in the footer. It is the
+so in the About panel (`D`, then About) and once in the footer. The panel says
+when it last looked, because between two looks the answer comes from a cache
+and can be up to a day old. It is the
 only thing jdtui says to anyone but My.JDownloader and the JDownloader
 itself: one unauthenticated request, answered from a cache on most runs, on
 its own thread, silent when it fails. `update_check = false` in the config

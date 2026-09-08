@@ -508,6 +508,10 @@ fn main() {
         update_available: false,
         direct: Some("http://192.168.1.30:3129".into()),
     });
+    app.update = Some(jdtui::update::Check {
+        newer: None,
+        checked: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() - 2 * 3600,
+    });
     app.mode = Mode::About;
     shot("about", &app);
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- The About panel says when it last looked for a newer jdtui. The answer can
+  be up to a day old — the check asks GitHub once a day and reads a cache in
+  between — so a plain "nothing newer released" was a claim about the world
+  when it was only a claim about the last look. It now reads "nothing newer
+  as of 3 hours ago", or says that nobody has managed to ask yet.
+
 ## 1.8.2 — 2026-09-08
 
 - A package waiting its turn says so. JDownloader writes "an error

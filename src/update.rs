@@ -39,29 +39,37 @@ fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
-/// The newest released version, if it is newer than this one.
-///
-/// Answers from the cache when it was filled less than a day ago, so this
-/// costs nothing on most runs. `None` means "nothing newer", "not looked
-/// yet" and "could not ask" alike; the caller has nothing different to do
-/// in any of those cases.
-pub fn newer_than(current: &str) -> Option<String> {
+/// What a look for a newer jdtui found, and when the looking happened.
+#[derive(Debug, Clone)]
+pub struct Check {
+    /// The newer version, or `None` for "this one is the newest known".
+    pub newer: Option<String>,
+    /// Seconds since the epoch. An answer from the cache carries the time
+    /// the cache was filled, not now: "nothing newer" is only ever true as
+    /// of when someone last asked, and the About panel says so.
+    pub checked: u64,
+}
+
+/// Look for a newer release, from the cache when it was filled less than a
+/// day ago. `None` means nobody has managed to ask yet.
+pub fn look(current: &str) -> Option<Check> {
     let cached = fs::read_to_string(cache_path()).ok().and_then(|t| serde_json::from_str::<Cache>(&t).ok());
-    let latest = match &cached {
-        Some(cache) if now().saturating_sub(cache.checked) < EVERY.as_secs() => cache.latest.clone(),
+    let cache = match cached {
+        Some(cache) if now().saturating_sub(cache.checked) < EVERY.as_secs() => cache,
         _ => {
-            let found = ask()?;
+            let fresh = Cache { checked: now(), latest: ask()? };
             let path = cache_path();
             if let Some(dir) = path.parent() {
                 let _ = fs::create_dir_all(dir);
             }
-            if let Ok(text) = serde_json::to_string(&Cache { checked: now(), latest: found.clone() }) {
+            if let Ok(text) = serde_json::to_string(&fresh) {
                 let _ = fs::write(&path, text);
             }
-            found
+            fresh
         }
     };
-    (parse(&latest) > parse(current)).then_some(latest)
+    let newer = (parse(&cache.latest) > parse(current)).then(|| cache.latest.clone());
+    Some(Check { newer, checked: cache.checked })
 }
 
 fn ask() -> Option<String> {
@@ -108,6 +116,6 @@ mod tests {
     #[ignore]
     fn ask_github() {
         println!("latest: {:?}", ask());
-        println!("newer than 0.0.1: {:?}", newer_than("0.0.1"));
+        println!("looking as 0.0.1: {:?}", look("0.0.1"));
     }
 }

@@ -228,9 +228,10 @@ pub struct App {
     /// The event channel is up: changes show at once, and the refresh slows
     /// down while nothing downloads.
     pub events_live: bool,
-    /// A newer jdtui than this one has been released. `None` while nothing
-    /// is known, which is also what a failed or disabled check leaves.
-    pub new_version: Option<String>,
+    /// What the look for a newer jdtui found, and when. `None` while
+    /// nothing is known, which is also what a failed or disabled check
+    /// leaves.
+    pub update: Option<crate::update::Check>,
 }
 
 impl App {
@@ -276,7 +277,7 @@ impl App {
             message: None,
             refresh_error: None,
             events_live: false,
-            new_version: None,
+            update: None,
         };
         if app.config.has_credentials() {
             let email = app.config.email.clone().unwrap_or_default();
@@ -331,7 +332,7 @@ impl App {
             message: None,
             refresh_error: None,
             events_live: false,
-            new_version: None,
+            update: None,
         };
         app.rebuild_rows();
         app
@@ -467,14 +468,16 @@ impl App {
             match update {
                 Update::Events(live) => self.events_live = live,
                 Update::Watched(outcomes) => watched.extend(outcomes),
-                Update::NewVersion(version) => {
+                Update::Checked(check) => {
                     // Said once, and never over something the user is
                     // reading: it can wait for the About panel.
-                    if self.message.is_none() {
+                    if let Some(version) = &check.newer
+                        && self.message.is_none()
+                    {
                         self.message =
                             Some((format!("jdtui {version} is out · github.com/rylos/jdtui/releases"), false));
                     }
-                    self.new_version = Some(version);
+                    self.update = Some(check);
                 }
                 other => latest = Some(other),
             }
@@ -486,7 +489,7 @@ impl App {
                 self.rebuild_rows();
             }
             Some(Update::Error(e)) => self.refresh_error = Some(e),
-            Some(Update::Events(_) | Update::Watched(_) | Update::NewVersion(_)) | None => {}
+            Some(Update::Events(_) | Update::Watched(_) | Update::Checked(_)) | None => {}
         }
         // After the snapshot, so the news of the folder is what stays on
         // screen rather than being overwritten by it.

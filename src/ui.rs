@@ -1069,6 +1069,19 @@ fn human_uptime(ms: i64) -> String {
 
 /// The JDownloader and the machine under it. Everything here is read once,
 /// when the panel opens.
+/// "3 hours ago", for a moment given in seconds since the epoch.
+fn since(when: u64) -> String {
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let secs = now.saturating_sub(when);
+    let (n, unit) = match secs {
+        0..=90 => return "a moment ago".into(),
+        s if s < 5400 => (s.div_ceil(60), "minute"),
+        s if s < 172_800 => (s.div_ceil(3600), "hour"),
+        s => (s.div_ceil(86_400), "day"),
+    };
+    format!("{n} {unit}{} ago", if n == 1 { "" } else { "s" })
+}
+
 fn draw_about(frame: &mut Frame, app: &App, area: Rect) {
     let Some(about) = &app.about else { return };
     let label = |text: &str| Span::styled(format!("  {text:<11}"), Style::new().dim());
@@ -1084,9 +1097,15 @@ fn draw_about(frame: &mut Frame, app: &App, area: Rect) {
     lines.push(Line::from(vec![
         label("Version"),
         Span::raw(env!("CARGO_PKG_VERSION")),
-        match &app.new_version {
-            Some(newer) => Span::styled(format!("  ·  {newer} is out"), Style::new().fg(Color::Yellow)),
-            None => Span::styled("  ·  nothing newer released", Style::new().dim()),
+        match &app.update {
+            Some(check) => match &check.newer {
+                Some(newer) => Span::styled(format!("  ·  {newer} is out"), Style::new().fg(Color::Yellow)),
+                // Qualified by when: the answer can be a day old, and
+                // "nothing newer released" on its own would be a claim
+                // about the world rather than about the last look.
+                None => Span::styled(format!("  ·  nothing newer as of {}", since(check.checked)), Style::new().dim()),
+            },
+            None => Span::styled("  ·  not looked for a newer one", Style::new().dim()),
         },
     ]));
 
@@ -1511,8 +1530,11 @@ mod tests {
         let mut app = App::with_snapshot(sample());
         app.about = Some(crate::api::About::default());
         app.mode = crate::app::Mode::About;
-        assert!(shows(&app, "nothing newer released"));
-        app.new_version = Some("99.0.0".into());
+        assert!(shows(&app, "not looked for a newer one"), "before anyone has asked");
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        app.update = Some(crate::update::Check { newer: None, checked: now - 3 * 3600 });
+        assert!(shows(&app, "nothing newer as of 3 hours ago"), "the answer is only as fresh as the last look");
+        app.update = Some(crate::update::Check { newer: Some("99.0.0".into()), checked: now });
         assert!(shows(&app, "99.0.0 is out"));
     }
 
