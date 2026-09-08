@@ -63,6 +63,9 @@ pub type Direct = Option<Vec<String>>;
 
 pub struct Poller {
     rx: Receiver<Update>,
+    /// Kept so a look for a newer jdtui can be started later, when the
+    /// About panel opens.
+    tx: Sender<Update>,
     wake: Sender<()>,
     stop: Arc<AtomicBool>,
     /// Device switches for the listener, with that device's own direct
@@ -86,12 +89,7 @@ impl Poller {
         // most of the time, but the first run of the day would otherwise
         // hold the first refresh up for as long as GitHub takes.
         if update_check {
-            let tx = tx.clone();
-            thread::spawn(move || {
-                if let Some(check) = crate::update::look(env!("CARGO_PKG_VERSION")) {
-                    let _ = tx.send(Update::Checked(check));
-                }
-            });
+            spawn_update_look(tx.clone(), false);
         }
         let events_alive = Arc::new(AtomicBool::new(false));
 
@@ -103,7 +101,9 @@ impl Poller {
         });
 
         let stop_flag = stop.clone();
+        let refresh_tx = tx.clone();
         thread::spawn(move || {
+            let tx = refresh_tx;
             let mut status = Status::default();
             let mut tick: u32 = 0;
             let mut woken = true;
@@ -172,7 +172,7 @@ impl Poller {
             }
         });
 
-        Poller { rx, wake: wake_tx, stop, device }
+        Poller { rx, tx, wake: wake_tx, stop, device }
     }
 
     pub fn try_recv(&self) -> Option<Update> {
@@ -182,6 +182,13 @@ impl Poller {
     /// Ask for a refresh now rather than at the next tick.
     pub fn refresh_now(&self) {
         let _ = self.wake.send(());
+    }
+
+    /// Ask GitHub now whether a newer jdtui is out, whatever the cache
+    /// says. The About panel does this when it opens: it is the moment
+    /// someone is actually reading the answer.
+    pub fn look_for_update(&self) {
+        spawn_update_look(self.tx.clone(), true);
     }
 
     /// Point the event listener at another JDownloader of the account,
@@ -202,6 +209,18 @@ impl Drop for Poller {
 
 /// The listener thread: subscribe, then `listen` in a loop, waking the
 /// refresh thread on every batch of events. Any failure closes the channel
+/// Ask GitHub, on a thread of its own so nothing waits for it. A failure
+/// sends nothing: not reaching GitHub is not news.
+fn spawn_update_look(tx: Sender<Update>, force: bool) {
+    thread::spawn(move || {
+        let version = env!("CARGO_PKG_VERSION");
+        let check = if force { crate::update::look_now(version) } else { crate::update::look(version) };
+        if let Some(check) = check {
+            let _ = tx.send(Update::Checked(check));
+        }
+    });
+}
+
 /// and reopens it after a pause; a device switch resubscribes there.
 fn listen(
     source: EventSource,

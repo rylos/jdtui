@@ -53,19 +53,36 @@ pub struct Check {
 /// Look for a newer release, from the cache when it was filled less than a
 /// day ago. `None` means nobody has managed to ask yet.
 pub fn look(current: &str) -> Option<Check> {
+    with_cache(current, false)
+}
+
+/// Ask GitHub now, however fresh the cache is. This is what opening the
+/// About panel does: someone is looking at the answer, so it is worth a
+/// request to make it true rather than up to a day old. If the request
+/// fails, whatever the cache holds is still better than nothing.
+pub fn look_now(current: &str) -> Option<Check> {
+    with_cache(current, true)
+}
+
+fn with_cache(current: &str, force: bool) -> Option<Check> {
     let cached = fs::read_to_string(cache_path()).ok().and_then(|t| serde_json::from_str::<Cache>(&t).ok());
-    let cache = match cached {
-        Some(cache) if now().saturating_sub(cache.checked) < EVERY.as_secs() => cache,
-        _ => {
-            let fresh = Cache { checked: now(), latest: ask()? };
-            let path = cache_path();
-            if let Some(dir) = path.parent() {
-                let _ = fs::create_dir_all(dir);
+    let fresh_enough = !force && cached.as_ref().is_some_and(|c| now().saturating_sub(c.checked) < EVERY.as_secs());
+    let cache = if fresh_enough {
+        cached?
+    } else {
+        match ask() {
+            Some(latest) => {
+                let fresh = Cache { checked: now(), latest };
+                let path = cache_path();
+                if let Some(dir) = path.parent() {
+                    let _ = fs::create_dir_all(dir);
+                }
+                if let Ok(text) = serde_json::to_string(&fresh) {
+                    let _ = fs::write(&path, text);
+                }
+                fresh
             }
-            if let Ok(text) = serde_json::to_string(&fresh) {
-                let _ = fs::write(&path, text);
-            }
-            fresh
+            None => cached?,
         }
     };
     let newer = (parse(&cache.latest) > parse(current)).then(|| cache.latest.clone());

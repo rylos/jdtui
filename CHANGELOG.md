@@ -6,7 +6,11 @@
   be up to a day old — the check asks GitHub once a day and reads a cache in
   between — so a plain "nothing newer released" was a claim about the world
   when it was only a claim about the last look. It now reads "nothing newer
-  as of 3 hours ago", or says that nobody has managed to ask yet.
+  as of 3 hours ago", or says that nobody has managed to ask yet — and
+  opening the panel asks GitHub there and then, whatever the cache holds,
+  since that is the moment somebody is reading the answer. The line says
+  "looking for a newer one…" while the request is out. The background check
+  keeps to its once-a-day timer.
 
 ## 1.8.2 — 2026-09-08
 

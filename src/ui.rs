@@ -1098,6 +1098,9 @@ fn draw_about(frame: &mut Frame, app: &App, area: Rect) {
         label("Version"),
         Span::raw(env!("CARGO_PKG_VERSION")),
         match &app.update {
+            _ if app.update_checking && app.update.as_ref().is_none_or(|c| c.newer.is_none()) => {
+                Span::styled("  ·  looking for a newer one…", Style::new().dim().italic())
+            }
             Some(check) => match &check.newer {
                 Some(newer) => Span::styled(format!("  ·  {newer} is out"), Style::new().fg(Color::Yellow)),
                 // Qualified by when: the answer can be a day old, and
@@ -1534,6 +1537,14 @@ mod tests {
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
         app.update = Some(crate::update::Check { newer: None, checked: now - 3 * 3600 });
         assert!(shows(&app, "nothing newer as of 3 hours ago"), "the answer is only as fresh as the last look");
+        app.update = Some(crate::update::Check { newer: Some("99.0.0".into()), checked: now });
+        assert!(shows(&app, "99.0.0 is out"));
+        // While a look is in flight, an "as of" that is about to be
+        // replaced is not what to show.
+        app.update = Some(crate::update::Check { newer: None, checked: now });
+        app.update_checking = true;
+        assert!(shows(&app, "looking for a newer one"));
+        // A version already found stays on screen: the answer is not stale.
         app.update = Some(crate::update::Check { newer: Some("99.0.0".into()), checked: now });
         assert!(shows(&app, "99.0.0 is out"));
     }

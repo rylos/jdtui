@@ -232,6 +232,9 @@ pub struct App {
     /// nothing is known, which is also what a failed or disabled check
     /// leaves.
     pub update: Option<crate::update::Check>,
+    /// A look for a newer jdtui is in flight, so the About panel can say
+    /// so rather than showing an answer that is about to be replaced.
+    pub update_checking: bool,
 }
 
 impl App {
@@ -278,6 +281,7 @@ impl App {
             refresh_error: None,
             events_live: false,
             update: None,
+            update_checking: false,
         };
         if app.config.has_credentials() {
             let email = app.config.email.clone().unwrap_or_default();
@@ -333,6 +337,7 @@ impl App {
             refresh_error: None,
             events_live: false,
             update: None,
+            update_checking: false,
         };
         app.rebuild_rows();
         app
@@ -469,6 +474,7 @@ impl App {
                 Update::Events(live) => self.events_live = live,
                 Update::Watched(outcomes) => watched.extend(outcomes),
                 Update::Checked(check) => {
+                    self.update_checking = false;
                     // Said once, and never over something the user is
                     // reading: it can wait for the About panel.
                     if let Some(version) = &check.newer
@@ -685,6 +691,16 @@ impl App {
                 Ok(about) => {
                     self.about = Some(about);
                     self.mode = Mode::About;
+                    // Somebody is about to read the answer, so make it true
+                    // rather than up to a day old. On its own thread: the
+                    // panel opens now and the line updates when GitHub
+                    // replies.
+                    if self.config.update_check()
+                        && let Some(poller) = &self.poller
+                    {
+                        self.update_checking = true;
+                        poller.look_for_update();
+                    }
                 }
                 Err(e) => self.finish(Err(e)),
             }
