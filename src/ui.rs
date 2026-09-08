@@ -560,7 +560,7 @@ fn stop_mark(app: &App, packages: &[Package], row: &Row) -> Span<'static> {
 /// The Status cell of a row. An archive jdtui can name itself wins over
 /// JDownloader's own sentence, which is written in its language and is
 /// usually too long for the column.
-fn status_span(packages: &[Package], row: &Row, extraction: Option<Extraction>) -> Span<'static> {
+fn status_span(packages: &[Package], row: &Row, extraction: Option<Extraction>, downloading: bool) -> Span<'static> {
     if let Some(state) = extraction {
         let style = match state {
             Extraction::Running => Style::new().fg(Color::Yellow).bold(),
@@ -573,12 +573,12 @@ fn status_span(packages: &[Package], row: &Row, extraction: Option<Extraction>) 
     let package = &packages[row.package];
     match row.link {
         None => Span::styled(
-            crate::model::package_status(package),
+            crate::model::package_status(package, downloading),
             status_style(package.is_finished(), package.is_running(), package.is_enabled(), false),
         ),
         Some(l) => {
             let link = &package.links[l];
-            let text = crate::model::link_status(link, package);
+            let text = crate::model::link_status(link, package, downloading);
             let running = link.running.unwrap_or(false);
             Span::styled(text, status_style(link.is_finished(), running, link.is_enabled(), true))
         }
@@ -629,6 +629,9 @@ fn status_style(finished: bool, running: bool, enabled: bool, link: bool) -> Sty
 }
 
 fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static str>, Vec<Constraint>, Vec<TRow<'a>>) {
+    // Whether the download controller is running at all: it separates a
+    // package waiting its turn from one merely sitting in the list.
+    let downloading = app.snapshot.is_running();
     let header = vec!["Name", "Links", "Size", "Status", "Progress", "%", "Speed", "ETA"];
     // Status carries sentences JDownloader wrote, so it gets a share of
     // its own rather than what is left over.
@@ -667,7 +670,7 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
                             ),
                             Style::new().dim(),
                         )),
-                        Cell::from(status_span(packages, row, extraction)),
+                        Cell::from(status_span(packages, row, extraction, downloading)),
                         Cell::from(progress_bar(pct, 18)),
                         Cell::from(format!("{pct:.0}%")),
                         Cell::from(Span::styled(
@@ -701,7 +704,7 @@ fn downloads_rows<'a>(app: &'a App, packages: &'a [Package]) -> (Vec<&'static st
                             ),
                             Style::new().dim(),
                         )),
-                        Cell::from(status_span(packages, row, extraction)),
+                        Cell::from(status_span(packages, row, extraction, downloading)),
                         Cell::from(""),
                         Cell::from(Span::styled(format!("{pct:.0}%"), Style::new().dim())),
                         Cell::from(
@@ -897,7 +900,7 @@ fn draw_properties(frame: &mut Frame, app: &App, area: Rect) {
             push("Name", Some(pkg.name.clone()));
             push("UUID", Some(pkg.uuid.to_string()));
             push("Type", Some("Package".into()));
-            push("Status", Some(crate::model::package_status(pkg)));
+            push("Status", Some(crate::model::package_status(pkg, app.snapshot.is_running())));
             // The sentence JDownloader wrote, in its own language and at
             // whatever length: this is the one place with room for it.
             push("JDownloader", pkg.status.clone());
@@ -921,7 +924,7 @@ fn draw_properties(frame: &mut Frame, app: &App, area: Rect) {
             push("Name", Some(link.name.clone()));
             push("UUID", Some(link.uuid.to_string()));
             push("Type", Some("Link".into()));
-            push("Status", Some(crate::model::link_status(link, pkg)));
+            push("Status", Some(crate::model::link_status(link, pkg, app.snapshot.is_running())));
             push("JDownloader", link.status.clone());
             push("Extraction", link.extraction_status.clone());
             push("Size", link.bytes_total.map(human_size));

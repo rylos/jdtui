@@ -60,6 +60,7 @@
 ## Link and package status (2026-09-07)
 
 - `status` on a link/package is JD's own sentence, in JD's language ("Caricamento mirror filestore.me", "Completato (mirror)", "Download (filestore.me)") and, on failure, a multi-line Java stack trace. NEVER put it in a table column: `model::package_status` / `model::link_status` derive the state from the booleans, and JD's first line is used only when nothing can be derived (an idle row that is idle because it failed).
-- `statusIconKey` does NOT identify an error: a failed link reports `kc.<md5>` (the hoster's icon), exactly like a healthy one. Values seen: `true` (finished), `true-orange` (finished as the mirror twin), `kc.<md5>` (hoster icon, any state), absent.
+- `statusIconKey` values seen: `true` (finished), `true-orange` (finished as the mirror twin), `false` (JD looked and the FILE IS GONE — it disables the link, so this is the only way to tell "offline" from "disabled"), `kc.<md5>` (the hoster's icon, any state), absent. It does NOT flag a transient failure: a link failing on a network error carries the hoster icon like a healthy one.
+- A package's `status` sentence is NOT a state. "Si è verificato un errore! (hoster)" appears while a hoster makes JD wait its turn, and the package starts normally a minute later. Derive from the flags plus `Snapshot::is_running()`: idle + controller running = Waiting, idle + controller stopped = Queued.
 - Mirrors: JD keeps one link per hoster for the same file. The twin that is not carrying the download is enabled, not running, not finished, 0 bytes loaded, and its sentence says "loading mirror" — i.e. it is simply waiting.
 - `queryLinks` accepts `skipped`, which is a real state and is now requested.

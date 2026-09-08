@@ -77,17 +77,18 @@ left, and anything that is waiting on you: captchas to solve, archives being
 extracted. `s` starts and stops the downloads, `p` pauses and resumes them.
 
 The **Status** column says what jdtui makes of a row rather than repeating
-JDownloader's own sentence: `Downloading`, `Waiting`, `Finished`, `Disabled`,
-`Skipped`, and for archives `Extracting`, `Extracted`, `Extraction failed`.
-JDownloader writes its sentences in whatever language it runs in — a JD set to
-Italian says `Caricamento mirror filestore.me` — and when something fails it
-writes a Java stack trace, neither of which belongs in a table row. jdtui
-works the state out from the booleans, the extraction queue and the package
-the row belongs to, which read the same everywhere.
+JDownloader's own sentence: `Downloading`, `Waiting`, `Queued`, `Finished`,
+`Offline`, `Disabled`, `Skipped`, and for archives `Extracting`, `Extracted`,
+`Extraction failed`. JDownloader writes its sentences in whatever language it
+runs in — a JD set to Italian says `Caricamento mirror filestore.me` — they
+are often longer than the column, and they are not states: the one that reads
+"an error occurred!" appears while a hoster makes JDownloader wait its turn,
+and the package starts normally a minute later. jdtui works the state out from
+the flags, the extraction queue, the package the row belongs to and whether
+the downloads are running at all.
 
-JDownloader's own words are kept for the one case nothing can be derived from,
-an idle row that is idle because something went wrong, and in full under `i`
-next to the state jdtui derived.
+What JDownloader wrote is one keypress away, in full, under `i`, next to the
+state jdtui derived.
 
 While an archive is being unpacked the **ETA** column counts that down too:
 JDownloader stops reporting a wait for the package then and puts one on each

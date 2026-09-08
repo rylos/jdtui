@@ -208,20 +208,27 @@ pub fn collect_ids(packages: &[Package], rows: &[Row]) -> (Vec<i64>, Vec<i64>) {
 /// What a package is doing, in jdtui's own words.
 ///
 /// JDownloader writes a sentence of its own — "Download (filestore.me)",
-/// "Caricamento mirror filestore.me" — in whatever language it runs in, so
-/// the state is derived from the booleans instead and the column reads the
-/// same for everybody. The sentence is kept for the one case nothing can be
-/// derived from: a package that is idle because something went wrong says
-/// so only there. The Properties panel shows it in full either way.
-pub fn package_status(package: &Package) -> String {
+/// "Si è verificato un errore! (filestore.me)" — in whatever language it
+/// runs in, and that sentence is not a state: the "error" one appears while
+/// a hoster makes JDownloader wait its turn, and the package starts
+/// normally a minute later. So the column is derived from the flags and
+/// reads the same for everybody; the sentence stays in the Properties
+/// panel, in full, where its length and its language do no harm.
+///
+/// `downloading` is whether the download controller is running at all,
+/// which is what separates a package waiting its turn from one that is
+/// merely in the list.
+pub fn package_status(package: &Package, downloading: bool) -> String {
     if !package.is_enabled() {
         "Disabled".into()
     } else if package.is_finished() {
         "Finished".into()
     } else if package.is_running() {
         "Downloading".into()
+    } else if downloading {
+        "Waiting".into()
     } else {
-        first_line(package.status.as_deref()).unwrap_or_else(|| "Queued".into())
+        "Queued".into()
     }
 }
 
@@ -230,8 +237,12 @@ pub fn package_status(package: &Package) -> String {
 /// A link of a running package that is not itself downloading is waiting
 /// its turn — which is what JDownloader's "loading mirror" sentence means
 /// for the second copy of a file offered by two hosters.
-pub fn link_status(link: &Link, package: &Package) -> String {
-    if !link.is_enabled() {
+pub fn link_status(link: &Link, package: &Package, downloading: bool) -> String {
+    if link.is_offline() {
+        // Checked before `enabled`, because JDownloader disables a link
+        // whose file has gone: "Disabled" would hide the reason.
+        "Offline".into()
+    } else if !link.is_enabled() {
         "Disabled".into()
     } else if link.is_finished() {
         "Finished".into()
@@ -239,18 +250,11 @@ pub fn link_status(link: &Link, package: &Package) -> String {
         "Downloading".into()
     } else if link.skipped.unwrap_or(false) {
         "Skipped".into()
-    } else if package.is_running() {
+    } else if package.is_running() || downloading {
         "Waiting".into()
     } else {
-        first_line(link.status.as_deref()).unwrap_or_else(|| "-".into())
+        "Queued".into()
     }
-}
-
-/// The first line of what JDownloader wrote. A failure puts a whole Java
-/// stack trace in there, and a table row has space for none of it.
-fn first_line(status: Option<&str>) -> Option<String> {
-    let text = status?.lines().next()?.trim();
-    (!text.is_empty()).then(|| text.to_string())
 }
 
 pub fn describe(rows: &[Row]) -> String {
@@ -804,34 +808,47 @@ mod tests {
             Link { enabled: Some(true), finished: Some(true), status: Some("Completato".into()), ..Default::default() };
         let off = Link { ..Default::default() };
 
-        assert_eq!(package_status(&package), "Downloading");
-        assert_eq!(link_status(&waiting, &package), "Waiting");
-        assert_eq!(link_status(&downloading, &package), "Downloading");
-        assert_eq!(link_status(&done, &package), "Finished");
-        assert_eq!(link_status(&off, &package), "Disabled");
+        assert_eq!(package_status(&package, true), "Downloading");
+        assert_eq!(link_status(&waiting, &package, true), "Waiting");
+        assert_eq!(link_status(&downloading, &package, true), "Downloading");
+        assert_eq!(link_status(&done, &package, true), "Finished");
+        assert_eq!(link_status(&off, &package, true), "Disabled");
     }
 
     #[test]
-    fn what_jdownloader_wrote_survives_where_nothing_can_be_derived() {
-        // An idle package with a failure behind it: the booleans say only
-        // that it is idle, so its own sentence is the whole story.
-        let failed = Package {
+    fn a_package_waiting_its_turn_is_not_a_failure() {
+        // JDownloader says "an error occurred!" while a hoster makes it
+        // wait, and the package then starts normally. It is waiting.
+        let held = Package {
             enabled: Some(true),
-            status: Some("Network problem: Caller: org.jdownloader...\r\nstack\r\ntrace".into()),
+            status: Some("Si è verificato un errore! (filestore.me)".into()),
             ..Default::default()
         };
-        assert_eq!(package_status(&failed), "Network problem: Caller: org.jdownloader...", "one line, not the trace");
+        assert_eq!(package_status(&held, true), "Waiting");
+        // With the controller stopped, the same package is simply listed.
+        assert_eq!(package_status(&held, false), "Queued");
+    }
 
-        let idle = Package { enabled: Some(true), ..Default::default() };
-        assert_eq!(package_status(&idle), "Queued");
-        assert_eq!(link_status(&Link { enabled: Some(true), ..Default::default() }, &idle), "-");
+    #[test]
+    fn a_link_whose_file_is_gone_says_so() {
+        // JDownloader disables such a link, so "Disabled" would hide why.
+        let package = Package { enabled: Some(true), running: Some(true), ..Default::default() };
+        let gone = Link { status_icon_key: Some("false".into()), ..Default::default() };
+        assert_eq!(link_status(&gone, &package, true), "Offline");
+        // In the grabber the same thing arrives as availability instead.
+        let unchecked = Link { availability: Some("OFFLINE".into()), enabled: Some(true), ..Default::default() };
+        assert_eq!(link_status(&unchecked, &package, true), "Offline");
+        // A link JDownloader disabled for its own reasons, such as a .rev,
+        // carries no such mark and stays disabled.
+        let rev = Link { status_icon_key: None, ..Default::default() };
+        assert_eq!(link_status(&rev, &package, true), "Disabled");
     }
 
     #[test]
     fn a_skipped_link_says_so() {
         let package = Package { enabled: Some(true), running: Some(true), ..Default::default() };
         let skipped = Link { enabled: Some(true), skipped: Some(true), ..Default::default() };
-        assert_eq!(link_status(&skipped, &package), "Skipped", "before the package's own running state");
+        assert_eq!(link_status(&skipped, &package, true), "Skipped", "before the package's own running state");
     }
 
     #[test]

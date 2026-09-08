@@ -65,6 +65,11 @@ pub struct Link {
     /// The variant currently chosen, when the link has any.
     pub variant: Option<LinkVariant>,
     pub running: Option<bool>,
+    /// The key of the icon JDownloader's own interface would draw. Mostly
+    /// the hoster's, which says nothing, but `false` means it looked and
+    /// the file is not there any more.
+    #[serde(rename = "statusIconKey")]
+    pub status_icon_key: Option<String>,
     /// The user told JDownloader to leave this link alone for now.
     pub skipped: Option<bool>,
     pub speed: Option<i64>,
@@ -105,6 +110,13 @@ impl Link {
     }
     pub fn is_finished(&self) -> bool {
         self.finished.unwrap_or(false)
+    }
+    /// The file is gone from the hoster. JDownloader disables such a link,
+    /// so without this it would read as merely disabled, like a `.rev` it
+    /// chose not to download.
+    pub fn is_offline(&self) -> bool {
+        self.status_icon_key.as_deref() == Some("false")
+            || self.availability.as_deref().is_some_and(|a| a.eq_ignore_ascii_case("OFFLINE"))
     }
     pub fn progress(&self) -> f64 {
         if self.is_finished() {
@@ -579,7 +591,7 @@ impl JdApi {
                 "comment": true, "enabled": true, "eta": true, "extractionStatus": true,
                 "finished": true, "finishedDate": true, "host": true, "packageUUIDs": [],
                 "priority": true, "running": true, "skipped": true, "speed": true,
-                "status": true, "url": true, "maxResults": -1, "startAt": 0,
+                "status": true, "statusIconKey": true, "url": true, "maxResults": -1, "startAt": 0,
             })],
         )?;
         Ok(attach(packages, links))

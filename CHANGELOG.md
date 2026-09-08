@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- A package waiting its turn says so. JDownloader writes "an error
+  occurred!" while a hoster makes it wait, and the package then starts
+  normally a minute later, so that sentence was never a state — and it
+  filled the column with a truncated line in JDownloader's own language.
+  Nothing JDownloader writes reaches the Status column any more: an idle
+  package reads `Waiting` while the downloads are running and `Queued` when
+  they are not. The Properties panel still shows the sentence in full.
+- A link whose file is gone from the hoster reads `Offline` rather than
+  `Disabled`. JDownloader disables such a link, which made it look like a
+  `.rev` it had chosen not to download; it also marks it, and that mark is
+  the same in every language.
+
 ## 1.8.1 — 2026-09-07
 
 - A direct connection comes back as soon as it can. jdtui armed its "look
