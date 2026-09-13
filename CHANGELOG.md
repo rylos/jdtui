@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.2 — 2026-09-13
+
+- 1.9.1 failed on every list with "missing field `links`": the `links` field of a package had lost its serde attribute. Fixed.
+
 ## 1.9.1 — 2026-09-13
 
 - Quick presses of `K` or `J` moved the wrong row: a snapshot begun before a move could arrive after it and put the old order back under the cursor. Snapshots older than the last move are now dropped, and the cursor follows the moved row by id.

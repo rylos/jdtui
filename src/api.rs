@@ -36,6 +36,7 @@ pub struct Package {
     pub hosts: Option<Vec<String>>,
     pub available_online_count: Option<i64>,
     pub available_offline_count: Option<i64>,
+    #[serde(skip)]
     pub links: Vec<Link>,
 }
 
