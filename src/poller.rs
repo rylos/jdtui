@@ -139,10 +139,16 @@ impl Poller {
                     // The api knows whether it wants a direct connection
                     // and which addresses belong to its device.
                     a.ensure_direct();
+                    // Stamped before the calls, not after: what matters is
+                    // whether the list was read before or after a change.
+                    let taken = std::time::Instant::now();
                     if woken || tick.is_multiple_of(STATUS_EVERY) {
                         status = a.status()?;
                     }
-                    a.snapshot(status.clone())
+                    a.snapshot(status.clone()).map(|mut s| {
+                        s.taken = Some(taken);
+                        s
+                    })
                 });
                 let update = match result {
                     Ok(Ok(s)) => {

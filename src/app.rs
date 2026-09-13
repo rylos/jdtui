@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, HashSet};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::api::{
     About, Account, AddLinks, EnumOption, FolderPolicy, JdApi, LinkVariant, RemoveMode, Snapshot, describe_error,
@@ -175,6 +175,12 @@ pub struct App {
     pub tab: Tab,
     pub rows: Vec<Row>,
     pub cursor: usize,
+    /// When a row was last moved. A snapshot taken before that shows the
+    /// old order and is dropped, or the cursor would land on the wrong row
+    /// between two quick presses.
+    moved_at: Option<Instant>,
+    /// The row the cursor should be on once the next snapshot is in.
+    follow: Option<RowKey>,
     pub expanded: HashSet<i64>,
     pub marked: HashSet<RowKey>,
     /// Substring the rows are filtered by; empty shows everything.
@@ -254,6 +260,8 @@ impl App {
             tab: Tab::Downloads,
             rows: Vec::new(),
             cursor: 0,
+            moved_at: None,
+            follow: None,
             expanded: HashSet::new(),
             marked: HashSet::new(),
             filter: String::new(),
@@ -310,6 +318,8 @@ impl App {
             tab: Tab::Downloads,
             rows: Vec::new(),
             cursor: 0,
+            moved_at: None,
+            follow: None,
             expanded: HashSet::new(),
             marked: HashSet::new(),
             filter: String::new(),
@@ -492,9 +502,20 @@ impl App {
         }
         match latest {
             Some(Update::Snapshot(s)) => {
-                self.snapshot = s;
-                self.refresh_error = None;
-                self.rebuild_rows();
+                let stale = match (s.taken, self.moved_at) {
+                    (Some(taken), Some(moved)) => taken < moved,
+                    _ => false,
+                };
+                if !stale {
+                    self.snapshot = s;
+                    self.refresh_error = None;
+                    self.rebuild_rows();
+                    if let Some(key) = self.follow.take()
+                        && let Some(i) = self.rows.iter().position(|r| row_key(self.packages(), r) == key)
+                    {
+                        self.cursor = i;
+                    }
+                }
             }
             Some(Update::Error(e)) => self.refresh_error = Some(e),
             Some(Update::Events(_) | Update::Watched(_) | Update::Checked(_)) | None => {}
@@ -753,6 +774,8 @@ impl App {
         if let Some(i) = self.rows.iter().position(|r| r.package == moved.package && r.link == moved.link) {
             self.cursor = i;
         }
+        self.moved_at = Some(Instant::now());
+        self.follow = Some(row_key(self.packages(), &moved));
         if let Some(p) = &self.poller {
             p.refresh_now();
         }

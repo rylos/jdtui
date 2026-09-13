@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.1 — 2026-09-13
+
+- Quick presses of `K` or `J` moved the wrong row: a snapshot begun before a move could arrive after it and put the old order back under the cursor. Snapshots older than the last move are now dropped, and the cursor follows the moved row by id.
+
 ## 1.9.0 — 2026-09-13
 
 - Rows can be moved: `K` and `J` move the row under the cursor one place up or down, package among packages or link within its package, and the cursor follows it. The context menu adds *Move up*, *Move down*, *Move to top*, *Move to bottom* for packages, and *Sort all packages by name*, which reads numbers as numbers so episode 2 comes before episode 10.

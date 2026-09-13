@@ -36,7 +36,6 @@ pub struct Package {
     pub hosts: Option<Vec<String>>,
     pub available_online_count: Option<i64>,
     pub available_offline_count: Option<i64>,
-    #[serde(skip)]
     pub links: Vec<Link>,
 }
 
@@ -158,6 +157,9 @@ pub struct Snapshot {
     pub grabber: Vec<Package>,
     /// Address the calls went to directly, bypassing the relay, if any.
     pub direct: Option<String>,
+    /// When the asking started. A snapshot begun before a change the app
+    /// made shows the list as it was, and the app throws it away.
+    pub taken: Option<Instant>,
 }
 
 impl Snapshot {
@@ -643,6 +645,7 @@ impl JdApi {
             downloads: self.downloads()?,
             grabber: self.grabber()?,
             direct: self.myjd.direct().map(str::to_string),
+            taken: None,
         })
     }
 

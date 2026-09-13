@@ -351,6 +351,7 @@ fn demo() -> Snapshot {
         downloads: vec![finished, running, unpacking, queued],
         grabber: vec![grabbed],
         direct: Some("http://192.168.1.20:3129".into()),
+        taken: None,
     }
 }
 
