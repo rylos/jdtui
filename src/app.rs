@@ -10,7 +10,8 @@ use crate::api::{
 use crate::config::Config;
 use crate::model::{
     Action, Form, MenuEntry, PRIORITIES, Row, RowKey, Tab, build_rows, collect_ids, context_menu, describe,
-    device_menu, packages_of, row_key, row_name, row_priority, row_stop_marked, stop_mark_target,
+    device_menu, natural_cmp, nudge, packages_of, packages_of_mut, row_key, row_name, row_priority, row_stop_marked,
+    stop_mark_target,
 };
 use crate::myjd::{Device, MyJd};
 use crate::options::{Edit, Setting};
@@ -105,6 +106,7 @@ pub const HELP: &[(&str, &[(&str, &str)])] = &[
         "Actions",
         &[
             ("Enter", "Context menu on the selection"),
+            ("K  J", "Move the row up / down one place"),
             ("i  P", "Properties of the selected row"),
             ("n", "Add links to the Link Grabber"),
             ("t", "Stop after this row (again to clear)"),
@@ -603,6 +605,14 @@ impl App {
                 self.mode = Mode::NewPackage;
                 return;
             }
+            Action::MoveUp => {
+                self.nudge_row(false);
+                return;
+            }
+            Action::MoveDown => {
+                self.nudge_row(true);
+                return;
+            }
             Action::Priority => {
                 // Start from the current priority when there is one row.
                 let current = if targets.len() == 1 { row_priority(self.packages(), &targets[0]) } else { None };
@@ -654,9 +664,39 @@ impl App {
             Action::PriorityTo(priority) => self
                 .with_api(|a| a.set_priority(priority, &links, &pkgs, grabber))
                 .map(|_| format!("{what} set to priority {}", priority.to_lowercase())),
+            Action::MoveTop => {
+                self.with_api(|a| a.move_packages(&pkgs, -1, grabber)).map(|_| format!("{what} moved to the top"))
+            }
+            Action::MoveBottom => {
+                // After the last package that is not itself moving.
+                match self.packages().iter().rev().find(|p| !pkgs.contains(&p.uuid)).map(|p| p.uuid) {
+                    Some(last) => self
+                        .with_api(|a| a.move_packages(&pkgs, last, grabber))
+                        .map(|_| format!("{what} moved to the bottom")),
+                    None => Ok(format!("{what} already at the bottom")),
+                }
+            }
+            Action::SortByName => {
+                let mut sorted: Vec<(i64, String)> = self.packages().iter().map(|p| (p.uuid, p.name.clone())).collect();
+                sorted.sort_by(|a, b| natural_cmp(&a.1, &b.1));
+                // One move per package, each after the one before it: the
+                // API places a list after one anchor and says nothing about
+                // the order within it.
+                self.with_api(|a| {
+                    let mut after = -1;
+                    for (id, _) in &sorted {
+                        a.move_packages(&[*id], after, grabber)?;
+                        after = *id;
+                    }
+                    Ok(())
+                })
+                .map(|_| format!("{} packages sorted by name", sorted.len()))
+            }
             Action::ToggleExpand
             | Action::Properties
             | Action::Priority
+            | Action::MoveUp
+            | Action::MoveDown
             | Action::Rename
             | Action::Directory
             | Action::ToggleStopMark
@@ -673,6 +713,49 @@ impl App {
             | Action::Reconnect => unreachable!(),
         };
         self.finish(outcome);
+    }
+
+    /// Move the row under the cursor one place up or down, and follow it.
+    /// The list shows the move at once rather than when the next snapshot
+    /// arrives, so a row can be walked along with repeated presses.
+    fn nudge_row(&mut self, down: bool) {
+        let Some(row) = self.current_row() else { return };
+        let Some(plan) = nudge(self.packages(), &row, down) else { return };
+        let grabber = self.tab.is_grabber();
+        let packages = self.packages();
+        let outcome = match row.link {
+            None => {
+                let id = packages[row.package].uuid;
+                self.with_api(|a| a.move_packages(&[id], plan.after, grabber))
+            }
+            Some(l) => {
+                let package = packages[row.package].uuid;
+                let id = packages[row.package].links[l].uuid;
+                self.with_api(|a| a.move_links(&[id], plan.after, package, grabber))
+            }
+        };
+        if let Err(e) = outcome {
+            self.message = Some((format!("Failed: {e}"), true));
+            return;
+        }
+        let list = packages_of_mut(&mut self.snapshot, self.tab);
+        let moved = match row.link {
+            None => {
+                list.swap(row.package, plan.to);
+                Row { package: plan.to, ..row }
+            }
+            Some(l) => {
+                list[row.package].links.swap(l, plan.to);
+                Row { link: Some(plan.to), ..row }
+            }
+        };
+        self.rebuild_rows();
+        if let Some(i) = self.rows.iter().position(|r| r.package == moved.package && r.link == moved.link) {
+            self.cursor = i;
+        }
+        if let Some(p) = &self.poller {
+            p.refresh_now();
+        }
     }
 
     /// Asks JDownloader first whether an update is pending, so the menu
@@ -1402,6 +1485,8 @@ impl App {
             Key::Down | Key::Char('j') => {
                 self.cursor = (self.cursor + 1).min(self.rows.len().saturating_sub(1));
             }
+            Key::Char('K') => self.nudge_row(false),
+            Key::Char('J') => self.nudge_row(true),
             Key::PageUp => self.cursor = self.cursor.saturating_sub(self.page.get().max(1)),
             Key::PageDown => {
                 self.cursor = (self.cursor + self.page.get().max(1)).min(self.rows.len().saturating_sub(1))

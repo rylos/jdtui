@@ -54,6 +54,73 @@ pub fn packages_of(snapshot: &Snapshot, tab: Tab) -> &[Package] {
     }
 }
 
+pub fn packages_of_mut(snapshot: &mut Snapshot, tab: Tab) -> &mut Vec<Package> {
+    match tab {
+        Tab::Downloads => &mut snapshot.downloads,
+        Tab::Grabber => &mut snapshot.grabber,
+    }
+}
+
+/// Where a row goes when moved one place: the id it lands after (`-1` for
+/// first) and the index it then has among its siblings, packages among
+/// packages, links among the links of their package.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Nudge {
+    pub after: i64,
+    pub to: usize,
+}
+
+/// The move for `row` one place up or down, or `None` at the edge.
+pub fn nudge(packages: &[Package], row: &Row, down: bool) -> Option<Nudge> {
+    let (ids, at): (Vec<i64>, usize) = match row.link {
+        None => (packages.iter().map(|p| p.uuid).collect(), row.package),
+        Some(l) => (packages[row.package].links.iter().map(|k| k.uuid).collect(), l),
+    };
+    let to = if down { at + 1 } else { at.checked_sub(1)? };
+    if to >= ids.len() {
+        return None;
+    }
+    // It lands after whatever will precede it: going down, the neighbour it
+    // swaps with; going up, the one above that neighbour.
+    let after = if down {
+        ids[to]
+    } else if to == 0 {
+        -1
+    } else {
+        ids[to - 1]
+    };
+    Some(Nudge { after, to })
+}
+
+/// Name order that reads numbers as numbers, so episode 2 comes before
+/// episode 10, and ignores case.
+pub fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    fn chunks(s: &str) -> Vec<(bool, String)> {
+        let mut out: Vec<(bool, String)> = Vec::new();
+        for c in s.chars() {
+            let digit = c.is_ascii_digit();
+            match out.last_mut() {
+                Some((d, text)) if *d == digit => text.extend(c.to_lowercase()),
+                _ => out.push((digit, c.to_lowercase().collect())),
+            }
+        }
+        out
+    }
+    let (x, y) = (chunks(a), chunks(b));
+    for (p, q) in x.iter().zip(y.iter()) {
+        let order = if p.0 && q.0 {
+            let (m, n) = (p.1.trim_start_matches('0'), q.1.trim_start_matches('0'));
+            m.len().cmp(&n.len()).then_with(|| m.cmp(n))
+        } else {
+            p.1.cmp(&q.1)
+        };
+        if order.is_ne() {
+            return order;
+        }
+    }
+    x.len().cmp(&y.len())
+}
+
 /// The visible rows. With a filter, a package stays if it matches by
 /// itself (then all its links show when expanded) or through some of its
 /// links (then only those show).
@@ -289,6 +356,14 @@ pub enum Action {
     /// Remove, having decided about the files.
     RemoveWith(RemoveMode),
     MoveToDownloads,
+    /// One row, one place; the cursor follows it.
+    MoveUp,
+    MoveDown,
+    /// The selected packages, in their order, to either end of the list.
+    MoveTop,
+    MoveBottom,
+    /// Every package of the tab, in `natural_cmp` order; ignores the selection.
+    SortByName,
     /// Empty the Link Grabber; ignores the selection.
     ClearGrabber,
     /// Open the priority chooser.
@@ -390,7 +465,14 @@ pub fn context_menu(tab: Tab, packages: &[Package], rows: &[Row], stop_mark: Opt
     insert(entry("Set priority…", Action::Priority, false));
     if single {
         insert(entry("Rename…", Action::Rename, false));
+        insert(entry("Move up", Action::MoveUp, false));
+        insert(entry("Move down", Action::MoveDown, false));
     }
+    if rows.iter().all(|r| r.is_package()) {
+        insert(entry("Move to top", Action::MoveTop, false));
+        insert(entry("Move to bottom", Action::MoveBottom, false));
+    }
+    insert(entry("Sort all packages by name", Action::SortByName, false));
     if rows.iter().all(|r| r.is_package()) {
         insert(entry("Set download folder…", Action::Directory, false));
     }
@@ -714,6 +796,48 @@ impl Form {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn numbered(names: &[&str]) -> Vec<Package> {
+        names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| Package {
+                uuid: 100 + i as i64,
+                name: n.to_string(),
+                links: (0..3)
+                    .map(|l| crate::api::Link { uuid: 1000 * (i as i64 + 1) + l, ..Default::default() })
+                    .collect(),
+                ..Default::default()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_package_moves_one_place_and_lands_after_the_right_one() {
+        let packages = numbered(&["a", "b", "c"]);
+        let row = |p| Row { kind: RowKind::Package, package: p, link: None };
+        assert_eq!(nudge(&packages, &row(1), true), Some(Nudge { after: 102, to: 2 }), "down: after c");
+        assert_eq!(nudge(&packages, &row(1), false), Some(Nudge { after: -1, to: 0 }), "up: first");
+        assert_eq!(nudge(&packages, &row(2), false), Some(Nudge { after: 100, to: 1 }), "up: after a");
+        assert_eq!(nudge(&packages, &row(0), false), None, "already first");
+        assert_eq!(nudge(&packages, &row(2), true), None, "already last");
+    }
+
+    #[test]
+    fn a_link_moves_among_the_links_of_its_package() {
+        let packages = numbered(&["a", "b"]);
+        let row = |l| Row { kind: RowKind::Link, package: 1, link: Some(l) };
+        assert_eq!(nudge(&packages, &row(0), true), Some(Nudge { after: 2001, to: 1 }));
+        assert_eq!(nudge(&packages, &row(2), false), Some(Nudge { after: 2000, to: 1 }));
+        assert_eq!(nudge(&packages, &row(2), true), None);
+    }
+
+    #[test]
+    fn names_sort_by_number_not_by_digit() {
+        let mut names = vec!["Show S19E10", "show S19E02", "Show S19E01E02", "Show S19E9", "Album 2", "album 10"];
+        names.sort_by(|a, b| natural_cmp(a, b));
+        assert_eq!(names, ["Album 2", "album 10", "Show S19E01E02", "show S19E02", "Show S19E9", "Show S19E10"]);
+    }
 
     #[test]
     fn text_fields_edit_at_the_cursor() {

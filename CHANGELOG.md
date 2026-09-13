@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.9.0 — 2026-09-13
+
+- Rows can be moved: `K` and `J` move the row under the cursor one place up or down, package among packages or link within its package, and the cursor follows it. The context menu adds *Move up*, *Move down*, *Move to top*, *Move to bottom* for packages, and *Sort all packages by name*, which reads numbers as numbers so episode 2 comes before episode 10.
+- The README points to jdsend, the browser extension companion.
+
 ## 1.8.3 — 2026-09-08
 
 - The About panel says when it last looked for a newer jdtui. The answer can

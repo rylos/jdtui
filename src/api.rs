@@ -706,6 +706,20 @@ impl JdApi {
         self.call_unit(path, &[json!(priority), json!(links), json!(packages)])
     }
 
+    /// Put `packages` right after the package `after`, or first with `-1`,
+    /// keeping their order among themselves.
+    pub fn move_packages(&mut self, packages: &[i64], after: i64, grabber: bool) -> Result<()> {
+        let path = if grabber { "/linkgrabberv2/movePackages" } else { "/downloadsV2/movePackages" };
+        self.call_unit(path, &[json!(packages), json!(after)])
+    }
+
+    /// Put `links` right after the link `after` inside `package`, or first
+    /// with `-1`.
+    pub fn move_links(&mut self, links: &[i64], after: i64, package: i64, grabber: bool) -> Result<()> {
+        let path = if grabber { "/linkgrabberv2/moveLinks" } else { "/downloadsV2/moveLinks" };
+        self.call_unit(path, &[json!(links), json!(after), json!(package)])
+    }
+
     pub fn rename_package(&mut self, package: i64, name: &str, grabber: bool) -> Result<()> {
         let path = if grabber { "/linkgrabberv2/renamePackage" } else { "/downloadsV2/renamePackage" };
         self.call_unit(path, &[json!(package), json!(name)])

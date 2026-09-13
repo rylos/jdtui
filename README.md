@@ -13,6 +13,10 @@ connected to it.
 
 ![The download list](https://raw.githubusercontent.com/rylos/jdtui/main/docs/downloads.png)
 
+Companion: [jdsend](https://github.com/rylos/jdsend), a browser extension that
+sends links, selections and container files to the same JDownloader from the
+right-click menu, and shows it at a glance from the toolbar.
+
 ## Install
 
 Download the binary for your machine from the [latest
@@ -125,6 +129,10 @@ What the menu offers, depending on the tab and the selection:
   ![Choosing a priority](https://raw.githubusercontent.com/rylos/jdtui/main/docs/priority.png)
 
 - **Rename…** a package or a link, **Set download folder…** for packages
+- **Move up**, **Move down** one place (`K` and `J` do it without the menu, and
+  the cursor follows the row), **Move to top**, **Move to bottom** for packages,
+  **Sort all packages by name**, with numbers read as numbers so episode 2
+  comes before episode 10
 - **Move to new package…**, **Split by hoster**
 - **Copy urls**: shows the urls of the selection and puts them on the
   clipboard, through the terminal (OSC 52), so it also works over SSH
@@ -230,6 +238,7 @@ questions worth asking when something looks wrong.
 | `PgUp` `PgDn` | Move by a page |
 | `Home` `End` (or `g` `G`) | First / last row |
 | `→` `←` | Expand / collapse a package |
+| `K` `J` | Move the row under the cursor up / down one place |
 | `/` | Filter the rows by name, hoster or status; `Esc` clears it |
 | `Space` | Mark the row under the cursor |
 | `a` | Mark every row, or clear the marks |
