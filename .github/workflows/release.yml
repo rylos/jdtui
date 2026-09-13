@@ -131,8 +131,13 @@ jobs:
             echo "No tag to upload to; the binaries are in this run's artifacts."
             exit 0
           fi
-          # The tag is annotated with the release notes, so a release this
-          # workflow has to create can take them from there.
+          # The tag is annotated with the release notes. The checkout peels
+          # it to its commit, so fetch the tag object itself and read the
+          # notes out of it; `--notes-from-tag` would fall back to the
+          # commit message.
+          git fetch --force --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
+          git for-each-ref "refs/tags/$TAG" --format='%(contents)' |
+            sed '/^-----BEGIN SSH SIGNATURE-----$/,$d' > notes.md
           gh release view "$TAG" >/dev/null 2>&1 ||
-            gh release create "$TAG" --title "jdtui ${TAG#v}" --notes-from-tag
+            gh release create "$TAG" --title "jdtui ${TAG#v}" --notes-file notes.md
           gh release upload "$TAG" dist/* --clobber
