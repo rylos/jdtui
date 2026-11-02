@@ -9,7 +9,7 @@ keywords = ["jdownloader", "tui", "downloads", "terminal"]
 categories = ["command-line-utilities"]
 # Notes for the coding agents that work on this repo, and their config:
 # useful in a checkout, noise in a published crate.
-exclude = [".serena", ".mcp.json"]
+exclude = [".serena", ".mcp.json", "CLAUDE.md"]
 
 [lib]
 name = "jdtui"
